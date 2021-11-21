@@ -1,9 +1,10 @@
 import React, { useEffect, useReducer } from "react";
 
-const withSubscribedRender = <T extends {}>(
+const withSubscribedRender = <T extends Record<string, any>>(
   WrappedComponent: React.ComponentType<T>,
   subscribeFunctions: Array<GenericFunction>,
-  unsubscribeFunctions: Array<GenericFunction>
+  unsubscribeFunctions: Array<GenericFunction>,
+  conditionProps: Array<keyof T> = []
 ) => {
   // Try to create a nice displayName for React Dev Tools.
   const displayName =
@@ -12,12 +13,31 @@ const withSubscribedRender = <T extends {}>(
   const ComponentWithSubscribedRender = (props: T) => {
     const [, forceUpdate] = useReducer((x) => x + 1, 0);
 
+    const conditions: Partial<Record<keyof T, any>> = {};
+
+    if (conditionProps.length !== 0) {
+      conditionProps.forEach((key) => {
+        if (props.hasOwnProperty(key)) conditions[key] = props[key];
+      });
+    }
+
     useEffect(() => {
-      subscribeFunctions.forEach((subscribeFunction) => subscribeFunction(forceUpdate));
-      return () => {
-        unsubscribeFunctions.forEach((unsubscribeFunction) => unsubscribeFunction(forceUpdate));
+      const subscriber = {
+        conditions,
+        subscriber: forceUpdate
       };
-    }, []);
+
+      subscribeFunctions.forEach((subscribeFunction) =>
+        subscribeFunction(subscriber)
+      );
+
+      return () => {
+        unsubscribeFunctions.forEach((unsubscribeFunction) =>
+          unsubscribeFunction(subscriber)
+        );
+      };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, Object.values(conditions));
 
     return <WrappedComponent {...props} />;
   };

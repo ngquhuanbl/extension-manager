@@ -24,10 +24,12 @@ function App() {
           },
         }}
       >
-        <ComponentList
-          position="UI_POSITION/TOOLBAR"
-          componentType="COMPONENT_TYPE/TOOLBAR_ICON"
-        />
+        <div>
+          <ComponentList
+            position="UI_POSITION/TOOLBAR"
+            componentType="COMPONENT_TYPE/TOOLBAR_ICON"
+          />
+        </div>
       </Flex>
       <Box w="500px" borderRight="1px" borderRightColor="gray.200">
         <Extensions />

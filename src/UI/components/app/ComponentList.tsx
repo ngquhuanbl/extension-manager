@@ -1,6 +1,5 @@
-import { useUI } from "core/adapters/UI";
-import { ComponentType } from "core/domain/componentRegistry";
-import UIManager, { UIPosition } from "core/domain/UIManager";
+import { useUI } from "UI/utils/hooks";
+import UIManager from "UI/lib/ui-manager";
 
 import withSubscribedRender from './withSubscribedRender';
 
@@ -22,5 +21,6 @@ const ComponentList: React.FC<Props> = ({
 export default withSubscribedRender(
   ComponentList,
   [UIManager.getInstance().subscribe.bind(UIManager.getInstance())],
-  [UIManager.getInstance().unsubscribe.bind(UIManager.getInstance())]
+  [UIManager.getInstance().unsubscribe.bind(UIManager.getInstance())],
+  ['position']
 );

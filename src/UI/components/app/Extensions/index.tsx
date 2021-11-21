@@ -1,7 +1,5 @@
 import { Grid } from "@chakra-ui/react";
-// import ExtensionManager from "core/domain/extensionManager";
 import React from "react";
-// import withSubscribedRender from "../withSubscribedRender";
 import AlertExtension from "./AlertExtension";
 import IUMExtension from "./IUMExtension";
 

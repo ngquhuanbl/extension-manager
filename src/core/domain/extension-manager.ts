@@ -1,7 +1,4 @@
-import { ComponentType } from "./componentRegistry";
-import { UIPosition } from "./UIManager";
-
-export interface ExtensionComponent {
+interface ExtensionComponent {
   position: UIPosition;
   type: ComponentType;
   id: ExtensionComponentID;
@@ -10,7 +7,7 @@ export interface ExtensionComponent {
 export interface Extension {
   id: ExtensionID;
   name: string;
-  components: Array<FrameworkExtensionComponent>;
+  components: Array<ExtensionComponent>;
 }
 
 class ExtensionManager {
