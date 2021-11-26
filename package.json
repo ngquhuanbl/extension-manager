@@ -5,7 +5,7 @@
   "main": "electron/main.js",
   "dependencies": {
     "@chakra-ui/icons": "^1.1.1",
-    "@chakra-ui/react": "^1.7.2",
+    "@chakra-ui/react": "1.6.12",
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@testing-library/jest-dom": "^5.11.4",

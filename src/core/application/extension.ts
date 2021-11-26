@@ -1,47 +1,78 @@
 import ExtensionManager, { Extension } from "../domain/extension-manager";
-import {
-  APIService,
-  ComponentRegistryService,
-  UIManagerService,
-} from "./ports";
+import { ComponentRegistryService, UIManagerService } from "./ports";
 
-interface ExtensionDataComponent extends FrameworkExtensionComponent {
-  component: FrameworkComponent;
-}
+// interface ExtensionDataComponent
+//   extends Omit<FrameworkExtensionComponent, "id"> {
+//   loadMode: 'synchronous' | 'lazy';
+//   component: FrameworkComponent;
+// }
 
-export interface ExtensionData extends Extension {
+type ExtensionDataComponent = (
+  | {
+      loadMode: "sync";
+      component: FrameworkComponent;
+    }
+  | {
+      loadMode: "lazy";
+      component: () => Promise<{ default: FrameworkComponent }>;
+    }
+) &
+  Omit<FrameworkExtensionComponent, "id">;
+
+export interface ExtensionData extends Pick<Extension, "id" | "name"> {
   components: Array<ExtensionDataComponent>;
 }
 
 interface Dependencies {
-  api: APIService;
   componentRegistry: ComponentRegistryService;
   uiManager: UIManagerService;
 }
 
 // TODO: Show install progress
 export const installExtension = async (
-  extensionID: ExtensionID,
+  extensionData: ExtensionData,
   dependencies: Dependencies
 ) => {
-  const { api, componentRegistry, uiManager } = dependencies;
-
-  // 1. Download the extension data
-  const { default: extensionData } = (await api.get(
-    `/extensions/${extensionID}`
-  )) as { default: ExtensionData };
+  const { componentRegistry, uiManager } = dependencies;
+  const extensionDataWithComponentIDs = Object.assign(
+    {},
+    extensionData
+  ) as any as Extension;
 
   // 2. Register extension components and insert them to their corresponding positions
-  const { components } = extensionData;
-  components.forEach(({ id: componentId, type, component, position }, index) => {
+  const { id: extensionID, components } = extensionData;
+  components.forEach((componentData, index) => {
+    const { type, position, loadMode } = componentData;
+    const componentID = extensionID + `-${index}`;
     // 2.1 Register extension components
-    componentRegistry.registerComponent(type, componentId, component);
+    switch (loadMode) {
+      case "sync": {
+        const { component } = componentData;
+        componentRegistry.registerComponent(type, componentID, component);
+        break;
+      }
+      case "lazy": {
+        const { component } = componentData;
+        componentRegistry.registerComponentUsingGetter(
+          type,
+          componentID,
+          component
+        );
+        break;
+      }
+      default:
+    }
     // 2.2. Insert extension components to their corresponding positions
-    uiManager.insertItem(position, componentId);
+    uiManager.insertItem(position, componentID);
+    // 2.3. Add generated componentID to extension data
+    extensionDataWithComponentIDs.components[index].id = componentID;
   });
 
   // 3. Save extension
-  ExtensionManager.getInstance().addExtension(extensionID, extensionData);
+  ExtensionManager.getInstance().addExtension(
+    extensionID,
+    extensionDataWithComponentIDs
+  );
 
   // 4. Sync user extension list to the server
 };

@@ -1,15 +1,13 @@
 import { Button } from "@chakra-ui/button";
 import { GridItem } from "@chakra-ui/layout";
 import { Text } from '@chakra-ui/react';
-import { useExtension } from "core/adapters/extension";
 import React, { useCallback } from "react";
+import { loadExtension } from "UI/utils/extensions";
 
 const IUMExtension: React.FC = () => {
-  const { installExtension } = useExtension();
-
-  const handleClick = useCallback(() => {
-    installExtension("665386c57-db49-529f-a0d6-807a040d6032-ium");
-  }, [installExtension]);
+  const handleClick = useCallback(async () => {
+    await loadExtension("ium-extension");
+  }, []);
   return (
     <>
       <GridItem colSpan={1} display="flex" alignItems="center">

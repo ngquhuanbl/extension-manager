@@ -6,6 +6,8 @@ interface FrameworkExtensionComponent {
 
 type FrameworkComponent = React.ComponentType<any>;
 
+type FrameworkFallbackComponent =  boolean | React.ReactChild | React.ReactFragment | React.ReactPortal | null;
+
 type ComponentID = string;
 
 type ExtensionID = string;

@@ -3,11 +3,12 @@ import Extensions from "UI/components/app/Extensions";
 import { useEffect } from "react";
 import ChatContent from "UI/components/app/ChatContent";
 import ComponentList from "UI/components/app/ComponentList";
-import { initDefaultUI } from "UI/utils/init";
+import { initDefaultUI, overrideDefineFunction } from "UI/utils/init";
 
 function App() {
   useEffect(() => {
     initDefaultUI();
+    overrideDefineFunction();
   }, []);
 
   return (
