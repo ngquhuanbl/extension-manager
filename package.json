@@ -25,10 +25,10 @@
     "web-vitals": "^1.0.1"
   },
   "scripts": {
-    "start:react": "react-app-rewired start",
-    "build": "react-app-rewired build",
-    "test": "react-app-rewired test",
-    "eject": "react-app-rewired eject",
+    "start:react": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
     "start:electron": "concurrently -k \"cross-env BROWSER=none yarn start:react\" \"yarn electron\"",
     "electron": "wait-on tcp:3000 && electron ."
   },
