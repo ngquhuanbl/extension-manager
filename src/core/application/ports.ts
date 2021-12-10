@@ -10,7 +10,7 @@ export interface ComponentRegistryService {
   registerComponentUsingGetter(
     componentType: ComponentType,
     componentID: ComponentID,
-    getter: () => Promise<{ default: FrameworkComponent }>,
+    component: FrameworkComponent,
     fallback?: FrameworkFallbackComponent
   ): void;
   removeComponent(componentType: ComponentType, componentID: string): void;

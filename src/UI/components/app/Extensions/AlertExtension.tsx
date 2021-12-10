@@ -5,8 +5,8 @@ import React, { useCallback } from "react";
 import { loadExtension } from "UI/utils/extensions";
 
 const AlertExtension: React.FC = () => {
-  const handleClick = useCallback(async () => {
-    await loadExtension('alert-extension')
+  const handleClick = useCallback(() => {
+    loadExtension('alert-extension')
   }, []);
 
   return (

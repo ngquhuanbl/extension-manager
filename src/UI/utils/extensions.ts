@@ -1,14 +1,23 @@
 import { loadScript } from "./load-scripts";
 
-export const isValidExtensionID = (extensionID: ExtensionID) => extensionID.includes('extension');
+interface ExtensionEnpoints {
+  content: string;
+  background: string;
+}
 
-export const loadExtension = async (extensionID: ExtensionID) => {
-  const endpoints: Record<ExtensionID, string> = {
-    "alert-extension": "http://localhost:3001/static/js/bundle.js",
-    "ium-extension": "http://localhost:3002/static/js/bundle.js",
+export const loadExtension = (extensionID: ExtensionID) => {
+  const endpoints: Record<ExtensionID, ExtensionEnpoints> = {
+    "alert-extension": {
+      content: 'http://localhost:3001/static/js/content.bundle.js',
+      background: 'http://localhost:3001/static/js/background.bundle.js'
+    },
+    "ium-extension": {
+      content: 'http://localhost:3002/static/js/content.bundle.js',
+      background: 'http://localhost:3002/static/js/background.bundle.js'
+    }
   };
 
-  const extensionEndpoint = endpoints[extensionID];
+  const { content, background } = endpoints[extensionID];
 
-  await loadScript(extensionEndpoint);
+  loadScript(content, { background });
 }

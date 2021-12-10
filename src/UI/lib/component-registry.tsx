@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
 
 interface ComponentData {
   id: ComponentID;
@@ -66,7 +66,7 @@ class ComponentRegistry {
   async registerComponentUsingGetter(
     componentType: ComponentType,
     componentID: ComponentID,
-    getter: () => Promise<{ default: FrameworkComponent }>,
+    LazyComponent: FrameworkComponent,
     fallback: FrameworkFallbackComponent = false
   ) {
     const register: Register = this.registry.get(componentType) || {
@@ -76,9 +76,8 @@ class ComponentRegistry {
 
     const { components: componentMap } = register;
 
-    const LazyComponent = lazy(async () => await getter())
 
-    const component = () => (
+    const LazyComponentWithSuspense = () => (
       <Suspense fallback={fallback}>
         <LazyComponent />
       </Suspense>
@@ -86,7 +85,7 @@ class ComponentRegistry {
 
     const componentData  = {
       id: componentID,
-      component
+      component: LazyComponentWithSuspense
     };
     componentMap.set(componentID, componentData);
 

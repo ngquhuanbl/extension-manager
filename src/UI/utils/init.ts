@@ -2,7 +2,7 @@ import ComponentRegistry from "UI/lib/component-registry";
 import UIManager from "UI/lib/ui-manager";
 import BuiltInMessage from "UI/components/built-in/Message";
 import { useExtension } from "core/adapters/extension";
-import { isValidExtensionID } from "./extensions";
+import { postMessageToExtensionBG } from "core/application/extension";
 
 const defaultExtensionDependencies = {
   "@chakra-ui/icons": import("@chakra-ui/icons"),
@@ -25,29 +25,53 @@ export const initDefaultUI = () => {
   UIManager.getInstance().insertItem("UI_POSITION/CONTENT", builtInMessageID);
 };
 
-export const overrideDefineFunction = () => {
-  (window as any).define = function () {
+export const createDefineExtFunction = () => {
+  (window as any).defineExt = function () {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const { installExtension } = useExtension();
 
-    const extensionID = arguments[0];
+    const manifestData = arguments[0];
     const dependencyNameList = arguments[1];
     const executor = arguments[2];
 
-    if (typeof extensionID !== "string" || !isValidExtensionID(extensionID))
-      return;
+    const currentScript =
+      document.currentScript ||
+      (function () {
+        var scripts = document.getElementsByTagName("script");
+        return scripts[scripts.length - 1];
+      })();
 
-    Promise.all(
-      // Prepare required dependencies for executor
-      dependencyNameList.map((depName: string) => {
-        return defaultExtensionDependencies[depName];
-      })
-    ).then((executorDependencies) => {
-      // Execute the executor
-      const { default: extensionData } = executor(
-        ...executorDependencies
-      );
-      installExtension(extensionData);
-    });
+    const backgroundScript = currentScript.getAttribute("param-background");
+    if (!backgroundScript) return;
+
+    fetch(backgroundScript)
+      .then((response) => response.blob())
+      .then((backgroundBlob) => {
+        const backgroundURL = URL.createObjectURL(backgroundBlob);
+
+        return Promise.all(
+          // Prepare required dependencies for executor
+          dependencyNameList.map((depName: string) => {
+            return defaultExtensionDependencies[depName];
+          })
+        ).then((executorDependencies) => {
+          // Execute the executor
+          const { default: extensionContentData } = executor(
+            ...executorDependencies
+          );
+
+          // Combine manifest data + content script data
+          const extensionData = {
+            ...manifestData,
+            ...extensionContentData,
+            backgroundURL,
+          };
+          installExtension(extensionData);
+        });
+      });
   };
+};
+
+export const createPostMessageToBGFunction = () => {
+  (window as any).postMessageToExtensionBG = postMessageToExtensionBG;
 };

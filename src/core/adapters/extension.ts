@@ -1,4 +1,9 @@
-import { ExtensionData, installExtension, uninstallExtension } from "../application/extension";
+import {
+  ExtensionData,
+  installExtension,
+  postMessageToExtensionBG,
+  uninstallExtension,
+} from "../application/extension";
 import { useComponentRegistry } from "./component-registry";
 import { useUIManager } from "./ui-manager";
 
@@ -11,5 +16,6 @@ export const useExtension = () => {
       installExtension(extensionData, { componentRegistry, uiManager }),
     uninstallExtenion: (extensionID: ExtensionID) =>
       uninstallExtension(extensionID, { componentRegistry, uiManager }),
+    postMessageToExtensionBG,
   };
 };

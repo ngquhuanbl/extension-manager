@@ -21,3 +21,17 @@ type GenericFunction = (...args: any[]) => any;
 type ComponentType = "COMPONENT_TYPE/TOOLBAR_ICON" | "COMPONENT_TYPE/MESSAGE";
 
 type UIPosition = 'UI_POSITION/TOOLBAR' | 'UI_POSITION/CONTENT';
+
+interface Root {
+  render(
+    Component: React.ComponentType<any>,
+    props: JSX.IntrinsicAttributes
+  ): void;
+  unmount(): void;
+}
+
+interface WorkerMessage {
+  type: 'BG_REQUEST' | 'BG_RESPONSE' | 'SDK_REQUEST' | 'SDK_RESPONSE',
+  context: string;
+  data: any;
+}

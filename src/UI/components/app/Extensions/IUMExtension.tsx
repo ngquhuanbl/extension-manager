@@ -5,8 +5,8 @@ import React, { useCallback } from "react";
 import { loadExtension } from "UI/utils/extensions";
 
 const IUMExtension: React.FC = () => {
-  const handleClick = useCallback(async () => {
-    await loadExtension("ium-extension");
+  const handleClick = useCallback(() => {
+    loadExtension("ium-extension");
   }, []);
   return (
     <>
