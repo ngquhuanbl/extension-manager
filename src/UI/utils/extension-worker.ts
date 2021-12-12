@@ -9,24 +9,14 @@ addEventListener(
   "message",
   async function (e) {
     if (typeof e.data === "object") {
-      const { type, context, data } = e.data;
+      const { data: workerMessage } = e;
+      const { type, context, messageData } = workerMessage as WorkerMessage;
 
-      // Handle SDK Message
-      if (type === "SDK_RESPONSE") {
-        // const responseData = await postMessageToSDK(data);
-        const responseMessage = {
-          type: "BG_RESPONSE",
-          context,
-          data,
-        };
-        postMessage(responseMessage);
-      }
-
-      // Handle BG message
+      // FLOW 1: BACKGROUND <-> WORKER
       if (type === "BG_REQUEST") {
         switch (context) {
           case "LOAD_BACKGROUND_SCRIPT": {
-            const { endpoint } = data;
+            const { endpoint } = messageData;
             importScripts(endpoint);
             break;
           }
@@ -39,18 +29,30 @@ addEventListener(
             break;
           }
           default: {
-            // BG requests that trigger SDK requests go here
+            // Requests of other contexts (which are received from background) will be fowarded to SDK
             const sdkMessage = {
+              ...workerMessage,
               type: "SDK_REQUEST",
-              context,
-              data,
             };
             postMessage(sdkMessage);
           }
         }
+        return;
+      }
+
+      // FLOW 2: WORKER <-> SDK
+      if (type === "SDK_RESPONSE") {
+        // Requests received from SDK will be fowarded to background
+        const responseMessage = {
+          ...workerMessage,
+          type: "BG_RESPONSE",
+        };
+        postMessage(responseMessage);
+        return;
       }
     }
   },
   false
 );
 
+export {}

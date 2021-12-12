@@ -1,3 +1,12 @@
+import Observer, { Subscriber } from "patterns/observer";
+import { createStandaloneToast } from "@chakra-ui/react";
+import ActivationMap, { EventConditions } from "./activation-map";
+import SDK from "./sdk";
+
+const toast = createStandaloneToast();
+
+const activationMap = ActivationMap.getInstance();
+
 interface ExtensionComponent {
   position: UIPosition;
   type: ComponentType;
@@ -7,91 +16,133 @@ interface ExtensionComponent {
 export class Extension {
   id: string;
   worker: Worker | null = null;
+
   constructor(
     public name: string,
     public publisher: string,
     public activationEvents: string[],
     public components: Array<ExtensionComponent>,
-    public backgroundURL: string
+    public backgroundURL: string | null = null
   ) {
-    this.id = Extension.createExtensionID(this.name, this.publisher);
+    // Construct data
+    this.id = Extension.getExtensionID(this.name, this.publisher);
     this.name = name;
     this.publisher = publisher;
     this.activationEvents = activationEvents;
     this.components = components;
     this.backgroundURL = backgroundURL;
 
-    // Check activation events to start worker
-    if (this.activationEvents.includes("*")) this.startWorker();
+    // Set up activation events
+    this.setUpActivationEvents();
   }
 
-  static createExtensionID(name: string, publisher: string) {
+  setUpActivationEvents() {
+    const registeredSubscribers: Array<Subscriber<EventConditions>> = [];
+    this.activationEvents.forEach((eventName) => {
+      registeredSubscribers.push(
+        activationMap.subscribeToActivationEvent(
+          eventName,
+          this.startWorker.bind(this)
+        ),
+        activationMap.subscribeToDeactivationEvent(
+          eventName,
+          this.terminateWorker.bind(this)
+        )
+      );
+    });
+
+    this.removeActivationEvents = function () {
+      registeredSubscribers.forEach((subscriber) => {
+        activationMap.unsubscribeToEvent(subscriber);
+      });
+    };
+  }
+
+  removeActivationEvents() {}
+
+  static getExtensionID(name: string, publisher: string) {
     return publisher.concat("-").concat(name).replace(/ /g, "-");
   }
 
   startWorker() {
     if (!this.worker) {
-      this.worker = new Worker("/static/js/extension-worker.bundle.js");
+      if (!this.backgroundURL) return;
 
+      this.worker = new Worker("static/js/extension-worker.bundle.js");
       this.worker.addEventListener("message", this.onMessage.bind(this), false);
 
-      this.worker.postMessage({
+      const loadBackgroundScriptMessage: WorkerMessage = {
         type: "BG_REQUEST",
         context: "LOAD_BACKGROUND_SCRIPT",
-        data: {
+        messageData: {
           endpoint: this.backgroundURL,
         },
-      });
-      this.worker.postMessage({
+      };
+      this.worker.postMessage(loadBackgroundScriptMessage);
+
+      const activateMessage: WorkerMessage = {
         type: "BG_REQUEST",
         context: "ACTIVATE",
-      });
+      };
+      this.worker.postMessage(activateMessage);
     }
   }
 
   terminateWorker() {
     if (this.worker) {
-      this.worker.postMessage({
-        type: "DEACTIVATE",
-      });
+      const deactivateMessage: WorkerMessage = {
+        type: "BG_REQUEST",
+        context: "DEACTIVATE",
+      };
+      this.worker.postMessage(deactivateMessage);
       this.worker?.terminate();
       this.worker = null;
     }
   }
 
   async onMessage(event: any) {
-    const { type, context, data } = event.data;
+    const { data: workerMessage } = event;
+    const { type, context, messageData, manifestData } =
+      workerMessage as WorkerMessage;
 
-    console.log(event.data)
-
+    // FLOW 1: BACKGROUND <-> WORKER
     if (type === "SDK_REQUEST") {
-      switch (context) {
-        case "window.dialog.showMessageBox": {
-          const res = await window.dialog.showMessageBox(data);
-          this.worker?.postMessage({
-            type: "SDK_RESPONSE",
-            context,
-            data: res,
-          });
-          break;
-        }
-        case "window.dialog.showMessageBoxSync": {
-          window.dialog.showMessageBoxSync(data);
-          break;
-        }
+      // Forward to Extension API Handlers to process
+      const sdkMessage = {
+        context,
+        messageData,
+        manifestData,
+      };
+      try {
+        const res = await SDK.getInstance().process(sdkMessage);
+
+        const sdkResponseMessage: WorkerMessage = {
+          type: "SDK_RESPONSE",
+          context,
+          messageData: res,
+        };
+        this.worker!.postMessage(sdkResponseMessage);
+      } catch (e: any) {
+        const { message } = e;
+        toast({
+          title: message,
+          status: "error",
+          isClosable: true,
+        });
       }
+    }
+
+    // FLOW 2: WORKER <-> SDK
+    if (type === "BG_RESPONSE") {
+      // Logic is already handled in postMessageToExtensionBG global function
     }
   }
 }
 
-class ExtensionManager {
-  static instance: ExtensionManager | null = null;
+class ExtensionManager extends Observer<{ id: ExtensionID }> {
+  private static instance: ExtensionManager | null = null;
 
-  private extensions: Map<ExtensionID, Extension>;
-
-  constructor() {
-    this.extensions = new Map();
-  }
+  private extensions: Map<ExtensionID, Extension> = new Map();
 
   static getInstance() {
     if (this.instance === null) {
@@ -108,6 +159,10 @@ class ExtensionManager {
     if (this.hasExtension(id)) return;
 
     this.extensions.set(id, extension);
+
+    this.notify({
+      id,
+    });
   }
 
   removeExtension(id: ExtensionID) {
@@ -117,7 +172,11 @@ class ExtensionManager {
 
     extension.terminateWorker();
 
+    extension.removeActivationEvents();
+
     this.extensions.delete(id);
+
+    this.notify({ id });
   }
 
   getExtension(id: ExtensionID) {

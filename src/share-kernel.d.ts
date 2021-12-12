@@ -33,5 +33,20 @@ interface Root {
 interface WorkerMessage {
   type: 'BG_REQUEST' | 'BG_RESPONSE' | 'SDK_REQUEST' | 'SDK_RESPONSE',
   context: string;
-  data: any;
+  messageData?: any;
+  manifestData?: ManifestData;
 }
+
+type WorkerMessageFromContentScript = Pick<WorkerMessage, 'context' | 'messageData'>;
+
+type EventName = string;
+
+type Permission = 'dialog' | 'bluetooth';
+
+interface ManifestData {
+  name: string;
+  publisher: string;
+  permissions: Array<Permission>;
+}
+
+type SDKMessage = Pick<WorkerMessage, 'context' | 'manifestData' | 'messageData'>

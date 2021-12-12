@@ -4,6 +4,7 @@ import React from "react";
 
 interface Props {
   icon?: JSX.Element;
+  selected: boolean;
   ariaLabel?: string;
   onClick?: () => void;
 }

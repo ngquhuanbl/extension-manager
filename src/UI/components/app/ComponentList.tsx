@@ -1,7 +1,7 @@
 import { useUI } from "UI/utils/hooks";
 import UIManager from "UI/lib/ui-manager";
 
-import withSubscribedRender from './withSubscribedRender';
+import withSubscribedRender from "../HOCs/withSubscribedRender";
 
 interface Props {
   position: UIPosition;
@@ -15,12 +15,18 @@ const ComponentList: React.FC<Props> = ({
   childrenProps = {},
 }) => {
   const { getRegisteredElementList } = useUI();
-  return <>{getRegisteredElementList(position, componentType, childrenProps)}</>;
+  return (
+    <>{getRegisteredElementList(position, componentType, childrenProps)}</>
+  );
 };
 
 export default withSubscribedRender(
   ComponentList,
-  [UIManager.getInstance().subscribe.bind(UIManager.getInstance())],
-  [UIManager.getInstance().unsubscribe.bind(UIManager.getInstance())],
-  ['position']
+  [
+    [
+      UIManager.getInstance().subscribe.bind(UIManager.getInstance()),
+      UIManager.getInstance().unsubscribe.bind(UIManager.getInstance()),
+    ],
+  ],
+  ["position"]
 );

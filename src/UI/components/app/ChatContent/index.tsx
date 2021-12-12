@@ -2,6 +2,7 @@ import { Box, Flex } from "@chakra-ui/layout";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import SingleItem from "UI/components/app/SingleItem";
 import { Props as MessageData } from "UI/components/built-in/Message";
+import withActivationEvent from "UI/components/HOCs/withActivationEvent";
 import ChatBox from "./ChatBox";
 
 const ChatContent = () => {
@@ -47,4 +48,4 @@ const ChatContent = () => {
   );
 };
 
-export default ChatContent;
+export default withActivationEvent(ChatContent, 'onView:chatContent');

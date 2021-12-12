@@ -1,5 +1,6 @@
-import withLazyLegacyRoot from "UI/components/app/withLazyLegacyRoot";
-import withLegacyRoot from "UI/components/app/withLegacyRoot";
+import withLazyCurrentRoot from "UI/components/HOCs/withLazyCurrentRoot";
+import withLazyLegacyRoot from "UI/components/HOCs/withLazyLegacyRoot";
+import withLegacyRoot from "UI/components/HOCs/withLegacyRoot";
 import ExtensionManager, { Extension } from "../domain/extension-manager";
 import { ComponentRegistryService, UIManagerService } from "./ports";
 
@@ -13,17 +14,26 @@ type ExtensionDataComponent = (
       component: () => Promise<{ default: FrameworkComponent }>;
     }
 ) &
-  Omit<FrameworkExtensionComponent, "id">;
+  Omit<FrameworkExtensionComponent, "id"> &
+  Partial<Pick<FrameworkExtensionComponent, "id">>;
 
-export interface ExtensionData extends Omit<Extension, "components"> {
+export interface ExtensionData {
+  name: string;
+  publisher: string;
+  activationEvents: string[];
   components: Array<ExtensionDataComponent>;
-  createLegacyRoot: (container: Element | DocumentFragment) => Root;
+  backgroundURL?: string;
+  createLegacyRoot?: (container: Element | DocumentFragment) => Root;
 }
 
 interface Dependencies {
   componentRegistry: ComponentRegistryService;
   uiManager: UIManagerService;
 }
+
+export const hasExtension = ExtensionManager.getInstance().hasExtension.bind(
+  ExtensionManager.getInstance()
+);
 
 // TODO: Show install progress
 export const installExtension = async (
@@ -38,15 +48,15 @@ export const installExtension = async (
     createLegacyRoot,
     activationEvents,
     components,
-    backgroundURL: backgroundBlob,
+    backgroundURL,
   } = extensionData;
 
-  const extensionID = Extension.createExtensionID(name, publisher);
+  const extensionID = Extension.getExtensionID(name, publisher);
 
   // 2. Generate component ID + Register extension components and insert them to their corresponding positions
   const componentsWithIDs = components.map(function (componentData, index) {
-    const { type, position, loadMode } = componentData;
-    const componentID = extensionID + `-${index}`;
+    const { type, position, loadMode, id } = componentData;
+    const componentID = id || extensionID + `-${index}`;
     // 2.1 Register extension components
     switch (loadMode) {
       case "sync": {
@@ -54,7 +64,9 @@ export const installExtension = async (
         componentRegistry.registerComponent(
           type,
           componentID,
-          withLegacyRoot(component, createLegacyRoot)
+          createLegacyRoot
+            ? withLegacyRoot(component, createLegacyRoot)
+            : component
         );
         break;
       }
@@ -63,7 +75,9 @@ export const installExtension = async (
         componentRegistry.registerComponentUsingGetter(
           type,
           componentID,
-          withLazyLegacyRoot(component, createLegacyRoot)
+          createLegacyRoot
+            ? withLazyLegacyRoot(component, createLegacyRoot)
+            : withLazyCurrentRoot(component)
         );
         break;
       }
@@ -74,7 +88,8 @@ export const installExtension = async (
 
     // 2.3. Add generated ID to component data
     return {
-      ...componentData,
+      type,
+      position,
       id: componentID,
     };
   });
@@ -85,9 +100,11 @@ export const installExtension = async (
     publisher,
     activationEvents,
     componentsWithIDs,
-    backgroundBlob
+    backgroundURL
   );
-  ExtensionManager.getInstance().addExtension(extensionID, extension);
+
+  const extensionManager = ExtensionManager.getInstance();
+  extensionManager.addExtension(extensionID, extension);
 
   // 4. Sync user extension list to the server
 };
@@ -118,41 +135,46 @@ export const uninstallExtension = (
 };
 
 export const postMessageToExtensionBG = (
-  extensionID: ExtensionID,
-  message: WorkerMessage
+  manifestData: ManifestData,
+  message: WorkerMessageFromContentScript
 ) => {
   return new Promise((resolve, reject) => {
     const extensionManager = ExtensionManager.getInstance();
-    const extension = extensionManager.getExtension(extensionID);
 
+    const { name, publisher } = manifestData;
+    const extensionID = Extension.getExtensionID(name, publisher);
+
+    const extension = extensionManager.getExtension(extensionID);
     if (!extension) reject(new Error("Non-existed extension"));
 
     const { worker } = extension!;
-
     const isExtensionActive = worker !== null;
-
     if (!isExtensionActive) reject(new Error("Non-active extension"));
 
-    worker!.postMessage(message);
+    const bgRequestMessage: WorkerMessage = {
+      ...message,
+      type: "BG_REQUEST",
+      manifestData,
+    };
+    worker!.postMessage(bgRequestMessage);
 
-    const { type: requestType, context: requestContext } = message;
+    const { context: requestContext } = message;
 
-    worker!.addEventListener(
-      "message",
-      (event: any) => {
-        const { data } = event;
-        const { type: responseType, context: responseContext } = data;
+    const callback = (event: any) => {
+      const { data } = event;
+      const { type: responseType, context: responseContext } = data;
 
-        const expectedResponseType = requestType.replace("REQUEST", "RESPONSE");
+      const expectedResponseType = "BG_RESPONSE";
 
-        if (
-          responseType === expectedResponseType &&
-          requestContext === responseContext
-        ) {
-          resolve(data);
-        }
-      },
-      false
-    );
+      if (
+        responseType === expectedResponseType &&
+        requestContext === responseContext
+      ) {
+        worker!.removeEventListener("message", callback);
+        resolve(data);
+      }
+    };
+
+    worker!.addEventListener("message", callback);
   });
 };

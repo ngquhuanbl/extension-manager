@@ -1,8 +1,9 @@
 import ComponentRegistry from "UI/lib/component-registry";
 import UIManager from "UI/lib/ui-manager";
 import BuiltInMessage from "UI/components/built-in/Message";
-import { useExtension } from "core/adapters/extension";
+import { useExtension } from "core/adapters/extensions";
 import { postMessageToExtensionBG } from "core/application/extension";
+import * as defaultExtensions from "extensions";
 
 const defaultExtensionDependencies = {
   "@chakra-ui/icons": import("@chakra-ui/icons"),
@@ -74,4 +75,12 @@ export const createDefineExtFunction = () => {
 
 export const createPostMessageToBGFunction = () => {
   (window as any).postMessageToExtensionBG = postMessageToExtensionBG;
+};
+
+export const installDefaultExtensions = () => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const { installExtension } = useExtension();
+  Object.values(defaultExtensions).forEach((extensionData) =>
+    installExtension(extensionData)
+  );
 };

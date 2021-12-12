@@ -16,7 +16,7 @@ type Registry = Map<RegisterID, Register>;
  * A registry used to store component
  */
 class ComponentRegistry {
-  static instance: ComponentRegistry | null = null;
+  private static instance: ComponentRegistry | null = null;
   private registry: Registry;
 
   private constructor() {

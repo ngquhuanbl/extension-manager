@@ -1,6 +1,6 @@
 import React from "react";
 
-import withSubscribedRender from './withSubscribedRender';
+import withSubscribedRender from "../HOCs/withSubscribedRender";
 import { useUI } from "UI/utils/hooks";
 import UIManager from "UI/lib/ui-manager";
 
@@ -17,14 +17,22 @@ const SingleItem: React.FC<Props> = ({
 }) => {
   const { getLastRegisteredElement } = useUI();
 
-  const prioritizedElement = getLastRegisteredElement(position, componentType, childrenProps);
+  const prioritizedElement = getLastRegisteredElement(
+    position,
+    componentType,
+    childrenProps
+  );
 
   return prioritizedElement;
 };
 
 export default withSubscribedRender(
   SingleItem,
-  [UIManager.getInstance().subscribe.bind(UIManager.getInstance())],
-  [UIManager.getInstance().unsubscribe.bind(UIManager.getInstance())],
-  ['position']
+  [
+    [
+      UIManager.getInstance().subscribe.bind(UIManager.getInstance()),
+      UIManager.getInstance().unsubscribe.bind(UIManager.getInstance()),
+    ],
+  ],
+  ["position"]
 );

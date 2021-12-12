@@ -1,11 +1,15 @@
-import Observer, { Conditions } from "./observer";
+import Observer, { Conditions } from "../../patterns/observer";
 
 type Position = UIPosition;
+
+interface UIConditions extends Conditions {
+  position: Position;
+}
 
 /**
  * Manage all components by their locations in UI
  */
- class UIManager extends Observer {
+ class UIManager extends Observer<UIConditions> {
   static instance: UIManager | null =  null;
   /**
    * pos: A hash table keeping track of components located at observed UI positions.

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const isDev = require("electron-is-dev");
+const { readFileSync } = require("fs");
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -31,8 +32,17 @@ function createWindow() {
     dialog.showMessageBoxSync(win, options);
   });
 
-  ipcMain.handle("show-open-dialog", (event, options) => {
-    return dialog.showOpenDialog(win, options);
+  ipcMain.handle("show-open-dialog", async (event, options) => {
+    const { filePaths, ...rest } = await dialog.showOpenDialog(win, options);
+
+    const base64FilePaths = filePaths.map((filePath) => {
+      const dataString = readFileSync(filePath).toString('base64');
+      return `data:image/png;base64,${dataString}`
+    })
+    return {
+      ...rest,
+      filePaths: base64FilePaths
+    }
   });
 }
 
