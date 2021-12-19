@@ -1,6 +1,7 @@
 import { createStandaloneToast } from "@chakra-ui/toast";
 import { nanoid } from "nanoid";
 import Observer from "patterns/observer";
+import TokenBucketRateLimit, { BucketOptions } from "patterns/token-bucket-rate-limit";
 // import TokenBucketRateLimit from "patterns/token-bucket-rate-limit";
 import { createAPIPath } from "UI/utils/api";
 import MessageManager, { EXT_MSG_EVENT_TYPE } from "../message-manager";
@@ -16,15 +17,14 @@ const CUSTOM_EVENT_TYPES: Record<string, string> = {
   "install-extension": "EXTENSION_MANAGER/INSTALL_EXTENSION",
 };
 
-// const TBRL_KEY_CONTENT_BG_SELF = "TBRL_KEY/CONTENT_BG_SELF";
-// const TBRL_KEY_BG_CONTENT_SELF = "TBRL_KEY/BG_CONTENT_SELF";
-// const TBRL_KEY_CONTENT_BG_OTHER = "TBRL_KEY/CONTENT_BG_OTHER";
-// const TBRL_KEY_BG_BG_OTHER = "TBRL_KEY/BG_BG_OTHER";
+const TBRL_KEY_CONTENT_BG = "TBRL_KEY/CONTENT_BG";
+const TBRL_KEY_BG_CONTENT = "TBRL_KEY/BG_CONTENT";
+const TBRL_KEY_BG_BG = "TBRL_KEY/BG_BG";
 
 class ExtensionManager extends Observer<{ id: ExtensionID }> {
   private static instance: ExtensionManager | null = null;
 
-  private rateLimitMessageQueue: Array<Message> = [];
+  private rateLimitMessageQueue: Map<string, Array<Message>> = new Map();
 
   static getInstance() {
     if (this.instance === null) {
@@ -184,17 +184,18 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     } else {
       const { target } = data as { target: ExtSourceOrTarget };
       const { type } = target;
+      const extensionManager = ExtensionManager.getInstance();
       if (type === "ext-bg") {
-        ExtensionManager.dispatchMsgFromExtBGToOtherExtBG(data);
+        extensionManager.dispatchMsgFromExtBGToOtherExtBG(data);
       } else if (type === "ext-content") {
-        ExtensionManager.dispatchMsgFromExtBGToExtContent(data);
+        extensionManager.dispatchMsgFromExtBGToExtContent(data);
       }
     }
   }
 
-  static async dispatchMsgFromExtContentToExtBG(data: Message) {
+  async dispatchMsgFromExtContentToExtBG(data: Message) {
     try {
-      // TODO: CHECK PERMISSION + RATE LIMIT
+      // CHECK PERMISSION
       const { source, target } = data as {
         source: ExtSourceOrTarget;
         target: ExtSourceOrTarget;
@@ -243,8 +244,8 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
           );
       }
 
-      // IF PASS, ENQUEUE THE MESSAGE
-      ExtensionManager.enqueueMessage(data);
+      // RATE LIMIT
+      this.rateLimitMessage(data, TBRL_KEY_CONTENT_BG, { interval: 1000, bucketCapacity: 3 })
     } catch (e: any) {
       const { message } = e;
       toast({
@@ -255,7 +256,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     }
   }
 
-  static dispatchMsgFromExtBGToExtContent(data: Message) {
+  dispatchMsgFromExtBGToExtContent(data: Message) {
     try {
       // CHECK PERMISSION
 
@@ -263,6 +264,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
       // it's passed by default
 
       // RATE LIMIT
+      this.rateLimitMessage(data, TBRL_KEY_BG_CONTENT, { interval: 1000, bucketCapacity: 3 })
     } catch (e: any) {
       const { message } = e;
       toast({
@@ -273,7 +275,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     }
   }
 
-  static async dispatchMsgFromExtBGToOtherExtBG(data: Message) {
+  async dispatchMsgFromExtBGToOtherExtBG(data: Message) {
     try {
       // CHECK PERMISSION
       const { source, target } = data as {
@@ -324,8 +326,8 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
           );
       }
 
-      // IF PASS, ENQUEUE THE MESSAGE
-      ExtensionManager.enqueueMessage(data);
+      // RATE LIMIT
+      this.rateLimitMessage(data, TBRL_KEY_BG_BG, { interval: 1000, bucketCapacity: 3 })
     } catch (e: any) {
       const { message } = e;
       toast({
@@ -336,12 +338,43 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     }
   }
 
-  enqueueAllRateLimitMessages() {
-    this.rateLimitMessageQueue.forEach((message) => {
-      ExtensionManager.enqueueMessage(message);
-    });
+  enqueueNewRateLimitMessage(key: string, data: Message) {
+    const rateLimitMessages = this.rateLimitMessageQueue.get(key) || [];
 
-    this.rateLimitMessageQueue = [];
+    rateLimitMessages.push(data);
+
+    this.rateLimitMessageQueue.set(key, rateLimitMessages);
+  }
+
+  enqueueAllRateLimitMessagesForExecution(key: string) {
+    const rateLimitMessage = this.rateLimitMessageQueue.get(key);
+
+    if (rateLimitMessage) {
+      rateLimitMessage.forEach((message) => {
+        ExtensionManager.enqueueMessage(message);
+      });
+
+      this.rateLimitMessageQueue.set(key, []);
+    }
+  }
+
+  rateLimitMessage(data: Message, bucketKeyType: string, options: BucketOptions) {
+    const { source, target } = data as {
+      source: ExtSourceOrTarget;
+      target: ExtSourceOrTarget;
+    };
+    const bucketKey = `${bucketKeyType}_${source.value}_${target.value}`;
+    const successTokenCallback = () => {
+      ExtensionManager.enqueueMessage(data);
+    }
+    const preRenewTokenCalback = () => {
+      this.enqueueNewRateLimitMessage(bucketKey, data);
+    }
+    const postRenewTokenCallback = () => {
+      this.enqueueAllRateLimitMessagesForExecution(bucketKey);
+    }
+    const tokenBucketRateLimit = TokenBucketRateLimit.getInstance();
+    tokenBucketRateLimit.takeToken(bucketKey, options, successTokenCallback, preRenewTokenCalback, postRenewTokenCallback);
   }
 
   static enqueueMessage(data: Message) {

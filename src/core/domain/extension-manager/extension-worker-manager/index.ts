@@ -88,7 +88,7 @@ export class ExtensionWorker {
 
         this.workerInstance.addEventListener(
           "message",
-          ExtensionManager.onMessage.bind(this)
+          ExtensionManager.onMessage
         );
 
         const loadBackgroundScriptMessage: WorkerMessage = {

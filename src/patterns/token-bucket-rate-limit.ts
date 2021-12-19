@@ -24,7 +24,7 @@ class TokenStateDB {
   }
 }
 
-interface BucketOptions {
+export interface BucketOptions {
   interval: number;
   bucketCapacity: number;
 }

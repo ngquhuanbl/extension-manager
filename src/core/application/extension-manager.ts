@@ -166,7 +166,9 @@ export const unsubscribe = ExtensionManager.getInstance().unsubscribe.bind(
 );
 
 export const dispatchMsgFromExtContentToExtBG =
-  ExtensionManager.dispatchMsgFromExtContentToExtBG;
+  ExtensionManager.getInstance().dispatchMsgFromExtContentToExtBG.bind(
+    ExtensionManager.getInstance()
+  );
 
 export const fetchExtension = ExtensionManager.fetchExtension;
 
@@ -217,5 +219,4 @@ export const getExtensionStatus = (extensionID: ExtensionID) => {
   if (!extensionInfo) return null;
 
   return extensionInfo.status;
-}
-
+};

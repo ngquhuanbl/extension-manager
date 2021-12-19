@@ -1,11 +1,15 @@
 import { createStandaloneToast } from "@chakra-ui/toast";
 import InterceptorManager, { Interceptor } from "patterns/intercepting-filter";
+import TokenBucketRateLimit, {
+  BucketOptions,
+} from "patterns/token-bucket-rate-limit";
 import ExtensionManager from "../extension-manager";
 import MessageManager from "../message-manager";
 import { DialogPermissionInterceptor } from "./interceptors";
 
 const toast = createStandaloneToast();
 
+const TBRL_KEY_SDK = "TBRL_KEY/SDK";
 export const SDK_MSG_HANDLER_KEY = "MSG_HANDLER/SDK";
 
 const HANDLERS: Record<string, GenericFunction> = {
@@ -34,7 +38,7 @@ const INTERCEPTORS: Record<string, Interceptor> = {
 class SDK {
   private static instance: SDK | null = null;
 
-  private rateLimitQueue = new Map<ExtensionID, Array<Message>>();
+  private rateLimitMessageQueue = new Map<ExtensionID, Array<Message>>();
 
   static getInstance() {
     if (this.instance === null) {
@@ -62,7 +66,7 @@ class SDK {
 
   dispatchMsgFromExtContentToSDK(data: Message) {
     try {
-      // TODO: CHECK PERMISSION + RATE LIMIT
+      // CHECK PERMISSION + RATE LIMIT
       const { source, type } = data;
       const extensionInfo = ExtensionManager.getExtensionInfo(
         (source as ExtSourceOrTarget).value
@@ -106,7 +110,7 @@ class SDK {
 
   dispatchMsgFromExtBGToSDK(data: Message) {
     try {
-      // TODO: CHECK PERMISSION + RATE LIMIT
+      // CHECK PERMISSION + RATE LIMIT
       const { source, type } = data;
       const extensionInfo = ExtensionManager.getExtensionInfo(
         (source as ExtSourceOrTarget).value
@@ -119,9 +123,11 @@ class SDK {
 
       const interceptedTarget = (data: Message) => {
         // IF PASS, ENQUEUE THE MESSAGE
-        const messageManager = MessageManager.getInstance();
         data.meta.handlerKey = SDK_MSG_HANDLER_KEY;
-        messageManager.enqueueMessage(data);
+        this.rateLimitMessage(data, {
+          interval: 1000,
+          bucketCapacity: 3,
+        });
       };
 
       const interceptors = this.getInterceptors(type);
@@ -148,15 +154,56 @@ class SDK {
     }
   }
 
+  rateLimitMessage(data: Message, options: BucketOptions) {
+    const { source } = data as {
+      source: ExtSourceOrTarget;
+    };
+    const bucketKey = `${TBRL_KEY_SDK}_${source.value}`;
+    const successTokenCallback = () => {
+      ExtensionManager.enqueueMessage(data);
+    };
+    const preRenewTokenCalback = () => {
+      this.enqueueNewRateLimitMessage(bucketKey, data);
+    };
+    const postRenewTokenCallback = () => {
+      this.enqueueAllRateLimitMessagesForExecution(bucketKey);
+    };
+    const tokenBucketRateLimit = TokenBucketRateLimit.getInstance();
+    tokenBucketRateLimit.takeToken(
+      bucketKey,
+      options,
+      successTokenCallback,
+      preRenewTokenCalback,
+      postRenewTokenCallback
+    );
+  }
+
+  enqueueNewRateLimitMessage(key: string, data: Message) {
+    const rateLimitMessages = this.rateLimitMessageQueue.get(key) || [];
+
+    rateLimitMessages.push(data);
+
+    this.rateLimitMessageQueue.set(key, rateLimitMessages);
+  }
+
+  enqueueAllRateLimitMessagesForExecution(key: string) {
+    const rateLimitMessage = this.rateLimitMessageQueue.get(key);
+
+    if (rateLimitMessage) {
+      rateLimitMessage.forEach((message) => {
+        ExtensionManager.enqueueMessage(message);
+      });
+
+      this.rateLimitMessageQueue.set(key, []);
+    }
+  }
+
   getInterceptors(messageType: string) {
     let permissions = messageType.split(".");
 
-    // Remove global object
-    permissions = permissions.filter((permission) => permission !== "window");
-    // Remove method name
-    if (permissions.length > 1) permissions.pop();
-
-    return permissions.map((permission) => INTERCEPTORS[permission]);
+    return permissions
+      .map((permission) => INTERCEPTORS[permission])
+      .filter((interceptor) => interceptor !== undefined);
   }
 }
 
