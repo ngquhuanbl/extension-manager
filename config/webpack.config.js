@@ -788,10 +788,10 @@ module.exports = function (webpackEnv) {
   const originalEntry = appConfig.entry;
   if (Array.isArray(originalEntry)) {
     extensionWorkerConfig.entry = originalEntry.map(function (config) {
-      return config.replace("index.tsx", "UI/utils/extension-worker.ts");
+      return config.replace("index.tsx", "core/domain/extension-manager/extension-worker-manager/extension-worker.ts");
     });
   } else {
-    extensionWorkerConfig.entry = originalEntry.replace("index.tsx", "UI/utils/extension-worker.ts");
+    extensionWorkerConfig.entry = originalEntry.replace("index.tsx", "core/domain/extension-manager/extension-worker-manager/extension-worker.ts");
   }
   // EXTENSION WORKER WEBPACK CONFIG - OUTPUT.FILENAME
   extensionWorkerConfig.output = {

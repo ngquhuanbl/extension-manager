@@ -5,7 +5,7 @@ import ChatContent from "UI/components/app/ChatContent";
 import {
   initDefaultUI,
   createDefineExtFunction,
-  createPostMessageToBGFunction,
+  createDispatchMsgFromExtContentFunction,
   installDefaultExtensions,
 } from "UI/utils/init";
 import Toolbar from "UI/components/app/Toolbar";
@@ -54,7 +54,7 @@ function App() {
   useEffect(() => {
     initDefaultUI();
     createDefineExtFunction();
-    createPostMessageToBGFunction();
+    createDispatchMsgFromExtContentFunction();
     installDefaultExtensions();
   }, []);
 

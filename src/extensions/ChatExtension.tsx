@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import ToolbarIcon from "UI/components/built-in/ToolbarIcon";
-import { ExtensionData } from "core/application/extension";
+import { ExtensionDataFromContentScript } from "core/application/extension-manager";
 import { ChatIcon } from "@chakra-ui/icons";
 
 interface Props {
@@ -29,9 +29,11 @@ const Component: React.FC<Props> = ({ selectedItem, onSelect }) => {
   );
 };
 
-const extensionData: ExtensionData = {
+const extensionData: ExtensionDataFromContentScript = {
+  id: 'zalo-chat-extension',
   name: 'chat-extension',
   publisher: 'zalo',
+  displayName: 'Chat extension',
   components: [{
     id: componentID,
     position: 'UI_POSITION/TOOLBAR',
@@ -39,6 +41,8 @@ const extensionData: ExtensionData = {
     component: Component,
     loadMode: 'sync'
   }],
-  activationEvents: ['*']
+  activationEvents: ['*'],
+  backgroundURL: '',
+  contentURL: ''
 };
 export default extensionData;

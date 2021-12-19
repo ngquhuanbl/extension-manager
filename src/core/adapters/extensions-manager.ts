@@ -1,23 +1,29 @@
 import {
-  ExtensionData,
+  ExtensionDataFromContentScript,
   installExtension,
-  postMessageToExtensionBG,
   uninstallExtension,
-  hasExtension
-} from "../application/extension";
+  hasExtension,
+  subscribe,
+  unsubscribe,
+  dispatchMsgFromExtContentToExtBG,
+  fetchExtension
+} from "../application/extension-manager";
 import { useComponentRegistry } from "./component-registry";
 import { useUIManager } from "./ui-manager";
 
-export const useExtension = () => {
+export const useExtensionManager = () => {
   const componentRegistry = useComponentRegistry();
   const uiManager = useUIManager();
 
   return {
     hasExtension,
-    installExtension: (extensionData: ExtensionData) =>
+    subscribe,
+    unsubscribe,
+    dispatchMsgFromExtContentToExtBG,
+    fetchExtension,
+    installExtension: (extensionData: ExtensionDataFromContentScript) =>
       installExtension(extensionData, { componentRegistry, uiManager }),
     uninstallExtension: (extensionID: ExtensionID) =>
       uninstallExtension(extensionID, { componentRegistry, uiManager }),
-    postMessageToExtensionBG,
   };
 };

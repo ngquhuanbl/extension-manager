@@ -25,11 +25,11 @@ function createWindow() {
   }
 
   ipcMain.handle("show-message-box", (event, options) => {
-    dialog.showMessageBox(win, options);
+    return dialog.showMessageBox(win, options);
   });
 
   ipcMain.handle("show-message-box-sync", (event, options) => {
-    dialog.showMessageBoxSync(win, options);
+    return dialog.showMessageBoxSync(win, options);
   });
 
   ipcMain.handle("show-open-dialog", async (event, options) => {

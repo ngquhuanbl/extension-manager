@@ -10,7 +10,7 @@ const Extensions: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const res = await fetch(createAPIPath('/extensions/marketplace'));
+      const res = await fetch(createAPIPath('/extensions/all'));
       const parsedRes = await res.json();
       const { extensions } = parsedRes;
       setData(extensions);

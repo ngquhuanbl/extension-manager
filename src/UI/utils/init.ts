@@ -1,9 +1,12 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 import ComponentRegistry from "UI/lib/component-registry";
 import UIManager from "UI/lib/ui-manager";
 import BuiltInMessage from "UI/components/built-in/Message";
-import { useExtension } from "core/adapters/extensions";
-import { postMessageToExtensionBG } from "core/application/extension";
 import * as defaultExtensions from "extensions";
+import { createExtensionID } from "./extensions";
+import { useExtensionManager } from "core/adapters/extensions-manager";
+import { useMessageManager } from "core/adapters/message-manager";
+import { useSDK } from "core/adapters/sdk";
 
 const defaultExtensionDependencies = {
   "@chakra-ui/icons": import("@chakra-ui/icons"),
@@ -29,9 +32,9 @@ export const initDefaultUI = () => {
 export const createDefineExtFunction = () => {
   (window as any).defineExt = function () {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { installExtension } = useExtension();
+    const { installExtension } = useExtensionManager();
 
-    const manifestData = arguments[0];
+    const manifestData = arguments[0] as ExtensionManifestData;
     const dependencyNameList = arguments[1];
     const executor = arguments[2];
 
@@ -42,44 +45,75 @@ export const createDefineExtFunction = () => {
         return scripts[scripts.length - 1];
       })();
 
-    const backgroundScript = currentScript.getAttribute("param-background");
-    if (!backgroundScript) return;
+    const backgroundURL = currentScript.getAttribute("param-background");
+    if (!backgroundURL) return;
 
-    fetch(backgroundScript)
-      .then((response) => response.blob())
-      .then((backgroundBlob) => {
-        const backgroundURL = URL.createObjectURL(backgroundBlob);
+    return Promise.all(
+      // Prepare required dependencies for executor
+      dependencyNameList.map((depName: string) => {
+        return defaultExtensionDependencies[depName];
+      })
+    ).then((executorDependencies) => {
+      // Execute the executor
+      const { default: extensionContentData } = executor(
+        ...executorDependencies
+      );
 
-        return Promise.all(
-          // Prepare required dependencies for executor
-          dependencyNameList.map((depName: string) => {
-            return defaultExtensionDependencies[depName];
-          })
-        ).then((executorDependencies) => {
-          // Execute the executor
-          const { default: extensionContentData } = executor(
-            ...executorDependencies
-          );
+      const { name, publisher } = manifestData;
 
-          // Combine manifest data + content script data
-          const extensionData = {
-            ...manifestData,
-            ...extensionContentData,
-            backgroundURL,
-          };
-          installExtension(extensionData);
-        });
-      });
+      const extensionID = createExtensionID(name, publisher);
+
+      // Combine manifest data + content script data
+      const extensionData = {
+        ...manifestData,
+        ...extensionContentData,
+        id: extensionID,
+        backgroundURL,
+      };
+      installExtension(extensionData);
+    });
   };
 };
 
-export const createPostMessageToBGFunction = () => {
-  (window as any).postMessageToExtensionBG = postMessageToExtensionBG;
+export const createDispatchMsgFromExtContentFunction = () => {
+  const { createReq } = useMessageManager();
+  const {
+    dispatchMsgFromExtContentToExtBG,
+  } = useExtensionManager();
+  const { dispatchMsgFromExtContentToSDK } = useSDK();
+
+  // This global function will only be call from content script extension
+  (window as any).dispatchMsgFromExtContent = function (data: Message) {
+    const { target, meta } = data;
+    const { fireAndForget } = meta;
+
+    let processor: GenericFunction = () => {};
+
+    if (target === "sdk") {
+      // The message is sent to SDK
+      processor = dispatchMsgFromExtContentToSDK;
+    } else {
+      // The message is sent to background scripts
+      processor = dispatchMsgFromExtContentToExtBG;
+    }
+
+    if (fireAndForget) {
+      processor(data);
+    } else {
+      return new Promise((resolve) => {
+        const req = createReq(data);
+
+        processor(req);
+
+        resolve(req.result);
+      });
+    }
+  };
 };
 
 export const installDefaultExtensions = () => {
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { installExtension } = useExtension();
+  const { installExtension } = useExtensionManager();
   Object.values(defaultExtensions).forEach((extensionData) =>
     installExtension(extensionData)
   );

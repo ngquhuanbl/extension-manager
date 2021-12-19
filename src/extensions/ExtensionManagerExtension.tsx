@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import ToolbarIcon from "UI/components/built-in/ToolbarIcon";
-import { ExtensionData } from "core/application/extension";
 import { StarIcon } from "@chakra-ui/icons";
+import { ExtensionDataFromContentScript } from "core/application/extension-manager";
 
 interface Props {
   selectedItem: string;
@@ -24,9 +24,11 @@ const Component: React.FC<Props> = ({ selectedItem, onSelect }) => {
   );
 };
 
-const extensionData: ExtensionData = {
+const extensionData: ExtensionDataFromContentScript = {
+  id: 'zalo-extension-manager-extension',
   name: 'extension-manager-extension',
   publisher: 'zalo',
+  displayName: 'Extension manager extension',
   components: [{
     id: componentID,
     position: 'UI_POSITION/TOOLBAR',
@@ -34,6 +36,8 @@ const extensionData: ExtensionData = {
     component: Component,
     loadMode: 'sync'
   }],
-  activationEvents: ['*']
+  activationEvents: ['*'],
+  backgroundURL: '',
+  contentURL: ''
 };
 export default extensionData;

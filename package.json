@@ -53,6 +53,7 @@
     "jest-watch-typeahead": "0.6.1",
     "lodash.ismatch": "^4.4.0",
     "mini-css-extract-plugin": "0.11.3",
+    "nanoid": "^3.1.30",
     "optimize-css-assets-webpack-plugin": "5.0.4",
     "pnp-webpack-plugin": "1.6.4",
     "postcss-flexbugs-fixes": "4.2.1",

@@ -6,7 +6,12 @@ interface FrameworkExtensionComponent {
 
 type FrameworkComponent = React.ComponentType<any>;
 
-type FrameworkFallbackComponent =  boolean | React.ReactChild | React.ReactFragment | React.ReactPortal | null;
+type FrameworkFallbackComponent =
+  | boolean
+  | React.ReactChild
+  | React.ReactFragment
+  | React.ReactPortal
+  | null;
 
 type ComponentID = string;
 
@@ -20,7 +25,7 @@ type GenericFunction = (...args: any[]) => any;
 
 type ComponentType = "COMPONENT_TYPE/TOOLBAR_ICON" | "COMPONENT_TYPE/MESSAGE";
 
-type UIPosition = 'UI_POSITION/TOOLBAR' | 'UI_POSITION/CONTENT';
+type UIPosition = "UI_POSITION/TOOLBAR" | "UI_POSITION/CONTENT";
 
 interface Root {
   render(
@@ -30,23 +35,47 @@ interface Root {
   unmount(): void;
 }
 
-interface WorkerMessage {
-  type: 'BG_REQUEST' | 'BG_RESPONSE' | 'SDK_REQUEST' | 'SDK_RESPONSE',
-  context: string;
-  messageData?: any;
-  manifestData?: ManifestData;
-}
-
-type WorkerMessageFromContentScript = Pick<WorkerMessage, 'context' | 'messageData'>;
+type WorkerMessage = Pick<Message, "payload" | "type"> & {
+  meta?: {
+    messageID: string;
+  };
+};
 
 type EventName = string;
 
-type Permission = 'dialog' | 'bluetooth';
+type Permission = "dialog" | "bluetooth" | ExtensionID;
 
-interface ManifestData {
+interface ExtensionManifestData {
+  displayName: string;
   name: string;
   publisher: string;
-  permissions: Array<Permission>;
+  permissions?: Array<Permission>;
+  activationEvents: string[];
 }
 
-type SDKMessage = Pick<WorkerMessage, 'context' | 'manifestData' | 'messageData'>
+type SDKMessage = Pick<WorkerMessage, "context" | "messageData"> &
+  Pick<ExtensionManifestData, "permissions">;
+
+type MESSAGE_HANDLER_KEY = "SDK" | "EXT_MANAGER";
+
+interface ExtSourceOrTarget {
+  type: "ext-bg" | "ext-content";
+  value: ExtensionID;
+}
+type MessageSourceOrTarget = "sdk" | ExtSourceOrTarget;
+
+interface Message {
+  type: string;
+  source: MessageSourceOrTarget;
+  target: MessageSourceOrTarget;
+  payload?: any;
+  meta: {
+    fireAndForget: boolean;
+    messageID?: string;
+    handlerKey?: string;
+  };
+}
+
+interface MessageEvent {
+  data: Message;
+}
