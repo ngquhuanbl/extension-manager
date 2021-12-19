@@ -27,30 +27,21 @@ class MessageManager {
       if (!this.isHandlingMessage && this.messageQueue.length !== 0) {
         const message = this.messageQueue.shift()!;
 
-        try {
-          const res = await this.handleMessage(message);
+        const res = await this.handleMessage(message);
 
-          // Return the result to the message sender
-          const { meta } = message;
-          const { fireAndForget } = meta;
-          if (!fireAndForget) {
-            const resMessage: Message = {
-              ...message,
-              payload: res,
-            };
+        // Return the result to the message sender
+        const { meta } = message;
+        const { fireAndForget } = meta;
+        if (!fireAndForget) {
+          const resMessage: Message = {
+            ...message,
+            payload: res,
+          };
 
-            const customEvent = new CustomEvent(EXT_MSG_EVENT_TYPE, {
-              detail: resMessage,
-            });
-            window.dispatchEvent(customEvent);
-          }
-        } catch (e: any) {
-          const { message } = e;
-          toast({
-            title: message,
-            status: "error",
-            isClosable: true,
+          const customEvent = new CustomEvent(EXT_MSG_EVENT_TYPE, {
+            detail: resMessage,
           });
+          window.dispatchEvent(customEvent);
         }
       }
     }, MESSAGE_QUEUE_INTERVAL);
@@ -61,22 +52,31 @@ class MessageManager {
   }
 
   async handleMessage(data: Message) {
-    // TODO: PICK THE RIGHT HANDLER FOR THE MESSAGE
-    const { meta } = data;
-    const { handlerKey } = meta;
+    try {
+      // TODO: PICK THE RIGHT HANDLER FOR THE MESSAGE
+      const { meta } = data;
+      const { handlerKey } = meta;
 
-    if (!handlerKey) throw new Error(`No handler key found`);
+      if (!handlerKey) throw new Error(`No handler key found`);
 
-    const handlerFunc = this.handlers.get(handlerKey);
+      const handlerFunc = this.handlers.get(handlerKey);
 
-    if (!handlerFunc)
-      throw new Error(
-        `No message handler found for handler key of value ${handlerKey}`
-      );
+      if (!handlerFunc)
+        throw new Error(
+          `No message handler found for handler key of value ${handlerKey}`
+        );
 
-    const res = handlerFunc(data);
+      const res = handlerFunc(data);
 
-    return res;
+      return res;
+    } catch (e: any) {
+      const { message } = e;
+      toast({
+        title: message,
+        status: "error",
+        isClosable: true,
+      });
+    }
   }
 
   createReq(data: Message) {

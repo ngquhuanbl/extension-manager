@@ -3,7 +3,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import SingleItem from "UI/components/app/SingleItem";
 import { Props as MessageData } from "UI/components/built-in/Message";
 import withActivationEvent from "UI/components/HOCs/withActivationEvent";
+import ComponentRegistry from "UI/lib/component-registry";
+import UIManager from "UI/lib/ui-manager";
 import ChatBox from "./ChatBox";
+import BuiltInMessage from "UI/components/built-in/Message";
 
 const ChatContent = () => {
   const [messages, setMessages] = useState<Array<MessageData>>([]);
@@ -16,6 +19,17 @@ const ChatContent = () => {
   useEffect(() => {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    const builtInMessageID = "0b16542f-db1a-52d3-94d2-1bb828e42c40";
+    ComponentRegistry.getInstance().registerComponent(
+      "COMPONENT_TYPE/MESSAGE",
+      builtInMessageID,
+      BuiltInMessage
+    );
+
+    UIManager.getInstance().insertItem("UI_POSITION/CONTENT", builtInMessageID);
+  }, [])
 
   return (
     <Flex direction="column">

@@ -1,18 +1,17 @@
 import { Flex } from "@chakra-ui/react";
-import Extensions from "UI/components/app/Extensions";
+import Extensions from "UI/components/app/Sidebar/Extensions";
 import React, { useEffect, useState } from "react";
-import ChatContent from "UI/components/app/ChatContent";
+import ChatContent from "UI/components/app/MainContent/ChatContent";
 import {
-  initDefaultUI,
   createDefineExtFunction,
   createDispatchMsgFromExtContentFunction,
-  installDefaultExtensions,
+  installPersistedExtensions,
 } from "UI/utils/init";
 import Toolbar from "UI/components/app/Toolbar";
 import Sidebar from "UI/components/app/Sidebar";
 import MainContent from "UI/components/app/MainContent";
-import { componentID as chatExtensionComponentID } from "extensions/ChatExtension";
-import { componentID as extensionManagerExtensionComponentID } from "extensions/ExtensionManagerExtension";
+import { componentID as chatExtensionComponentID } from "UI/components/app/Toolbar/ChatToolbarIcon";
+import { componentID as extensionManagerExtensionComponentID } from "UI/components/app/Toolbar/ExtensionManagerToolbarIcon";
 import withActivationEvent from "UI/components/HOCs/withActivationEvent";
 
 const views: Record<
@@ -52,10 +51,9 @@ function App() {
   }, [selectedToolbarItem]);
 
   useEffect(() => {
-    initDefaultUI();
     createDefineExtFunction();
     createDispatchMsgFromExtContentFunction();
-    installDefaultExtensions();
+    installPersistedExtensions();
   }, []);
 
   return (

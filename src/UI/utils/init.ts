@@ -1,8 +1,4 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import ComponentRegistry from "UI/lib/component-registry";
-import UIManager from "UI/lib/ui-manager";
-import BuiltInMessage from "UI/components/built-in/Message";
-import * as defaultExtensions from "extensions";
 import { createExtensionID } from "./extensions";
 import { useExtensionManager } from "core/adapters/extensions-manager";
 import { useMessageManager } from "core/adapters/message-manager";
@@ -18,16 +14,6 @@ const defaultExtensionDependencies = {
   "react-dom": import("react-dom"),
 } as Record<string, Promise<any>>;
 
-export const initDefaultUI = () => {
-  const builtInMessageID = "0b16542f-db1a-52d3-94d2-1bb828e42c40";
-  ComponentRegistry.getInstance().registerComponent(
-    "COMPONENT_TYPE/MESSAGE",
-    builtInMessageID,
-    BuiltInMessage
-  );
-
-  UIManager.getInstance().insertItem("UI_POSITION/CONTENT", builtInMessageID);
-};
 
 export const createDefineExtFunction = () => {
   (window as any).defineExt = function () {
@@ -45,6 +31,7 @@ export const createDefineExtFunction = () => {
         return scripts[scripts.length - 1];
       })();
 
+    const contentURL = currentScript.getAttribute("src");
     const backgroundURL = currentScript.getAttribute("param-background");
     if (!backgroundURL) return;
 
@@ -69,6 +56,7 @@ export const createDefineExtFunction = () => {
         ...extensionContentData,
         id: extensionID,
         backgroundURL,
+        contentURL
       };
       installExtension(extensionData);
     });
@@ -77,9 +65,7 @@ export const createDefineExtFunction = () => {
 
 export const createDispatchMsgFromExtContentFunction = () => {
   const { createReq } = useMessageManager();
-  const {
-    dispatchMsgFromExtContentToExtBG,
-  } = useExtensionManager();
+  const { dispatchMsgFromExtContentToExtBG } = useExtensionManager();
   const { dispatchMsgFromExtContentToSDK } = useSDK();
 
   // This global function will only be call from content script extension
@@ -111,10 +97,16 @@ export const createDispatchMsgFromExtContentFunction = () => {
   };
 };
 
-export const installDefaultExtensions = () => {
+export const installPersistedExtensions = () => {
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { installExtension } = useExtensionManager();
-  Object.values(defaultExtensions).forEach((extensionData) =>
-    installExtension(extensionData)
+  const { fetchExtension } = useExtensionManager();
+  const installedExtensions = JSON.parse(
+    window.localStorage.getItem("extensions") || `{}`
+  );
+
+  Object.entries(installedExtensions).forEach(
+    ([id, { displayName, contentURL, backgroundURL }]: [any, any]) => {
+      fetchExtension(id, displayName, contentURL, backgroundURL, "silent");
+    }
   );
 };

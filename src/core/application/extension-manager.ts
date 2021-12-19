@@ -1,9 +1,14 @@
-import { ExtensionInfo } from "core/domain/extension-manager/extension-info-manager";
+import { createStandaloneToast } from "@chakra-ui/toast";
+import ExtensionInfoManager, {
+  ExtensionInfo,
+} from "core/domain/extension-manager/extension-info-manager";
 import withLazyCurrentRoot from "UI/components/HOCs/withLazyCurrentRoot";
 import withLazyLegacyRoot from "UI/components/HOCs/withLazyLegacyRoot";
 import withLegacyRoot from "UI/components/HOCs/withLegacyRoot";
 import ExtensionManager from "../domain/extension-manager";
 import { ComponentRegistryService, UIManagerService } from "./ports";
+
+const toast = createStandaloneToast();
 
 type ExtensionDataComponent = (
   | {
@@ -87,6 +92,7 @@ export const installExtension = async (
   const extensionInfo: ExtensionInfo = {
     ...extensionData,
     components: componentsWithIDs,
+    status: "ENABLED",
   };
 
   const extensionManager = ExtensionManager.getInstance();
@@ -98,6 +104,7 @@ export const installExtension = async (
   );
 
   installedExtensions[extensionID] = {
+    displayName: extensionInfo.displayName,
     contentURL: extensionInfo.contentURL,
     backgroundURL: extensionInfo.backgroundURL,
   };
@@ -110,7 +117,7 @@ export const installExtension = async (
 
 export const uninstallExtension = (
   extensionID: ExtensionID,
-  dependencies: Pick<Dependencies, "componentRegistry" | "uiManager">
+  dependencies: Dependencies
 ) => {
   // STEP 1: REMOVE ALL CONTENT APPLIED BY CONTENT SCRIPT
   const { componentRegistry, uiManager } = dependencies;
@@ -141,6 +148,13 @@ export const uninstallExtension = (
     "extensions",
     JSON.stringify(installedExtensions)
   );
+
+  // STEP 4: Show step info
+  toast({
+    title: `'${extensionInfo.displayName}' extension is uninstalled!`,
+    status: "success",
+    isClosable: true,
+  });
 };
 
 export const subscribe = ExtensionManager.getInstance().subscribe.bind(
@@ -155,3 +169,53 @@ export const dispatchMsgFromExtContentToExtBG =
   ExtensionManager.dispatchMsgFromExtContentToExtBG;
 
 export const fetchExtension = ExtensionManager.fetchExtension;
+
+export const setExtensionStatus = (
+  extensionID: ExtensionID,
+  status: ExtensionStatus,
+  dependencies: Pick<Dependencies, "uiManager">
+) => {
+  const { uiManager } = dependencies;
+
+  const doesExtensionExist = ExtensionManager.hasExtension(extensionID);
+  if (!doesExtensionExist) return;
+
+  // STEP 1: UPDATE EXTENSION INFO
+  const extensionManager = ExtensionManager.getInstance();
+  extensionManager.updateExtensionInfo(extensionID, { status });
+  // STEP 2: UPDATE UI MANAGER
+  const extensionInfo = ExtensionManager.getExtensionInfo(extensionID);
+  if (extensionInfo) {
+    const { components } = extensionInfo;
+    components.forEach(({ position, id }) => {
+      let positionComponentStatus: PositionComponentStatus = "ACTIVE";
+
+      switch (status) {
+        case "ENABLED": {
+          positionComponentStatus = "ACTIVE";
+          break;
+        }
+        case "DISABLED": {
+          positionComponentStatus = "INACTIVE";
+          break;
+        }
+      }
+
+      uiManager.setComponentStatus(position, id, positionComponentStatus);
+    });
+  }
+
+  // STEP 3: TERMINATE EXTENSION WORKER
+  ExtensionManager.terminateExtensionWorker(extensionID);
+};
+
+export const getExtensionStatus = (extensionID: ExtensionID) => {
+  const extensionInfoManager = ExtensionInfoManager.getInstance();
+
+  const extensionInfo = extensionInfoManager.getExtensionInfo(extensionID);
+
+  if (!extensionInfo) return null;
+
+  return extensionInfo.status;
+}
+

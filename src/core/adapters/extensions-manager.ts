@@ -6,7 +6,9 @@ import {
   subscribe,
   unsubscribe,
   dispatchMsgFromExtContentToExtBG,
-  fetchExtension
+  fetchExtension,
+  getExtensionStatus,
+  setExtensionStatus,
 } from "../application/extension-manager";
 import { useComponentRegistry } from "./component-registry";
 import { useUIManager } from "./ui-manager";
@@ -21,6 +23,9 @@ export const useExtensionManager = () => {
     unsubscribe,
     dispatchMsgFromExtContentToExtBG,
     fetchExtension,
+    getExtensionStatus,
+    setExtensionStatus: (extensionID: ExtensionID, status: ExtensionStatus) =>
+      setExtensionStatus(extensionID, status, { uiManager }),
     installExtension: (extensionData: ExtensionDataFromContentScript) =>
       installExtension(extensionData, { componentRegistry, uiManager }),
     uninstallExtension: (extensionID: ExtensionID) =>

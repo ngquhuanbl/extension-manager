@@ -5,6 +5,7 @@ export const useUIManager = (): UIManagerService => {
   const instance = UIManager.getInstance();
   return {
     insertItem: instance.insertItem.bind(instance),
-    removeItem: instance.removeItem.bind(instance)
+    removeItem: instance.removeItem.bind(instance),
+    setComponentStatus: instance.setComponentStatus.bind(instance)
   }
 }

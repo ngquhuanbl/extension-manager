@@ -19,4 +19,5 @@ export interface ComponentRegistryService {
 export interface UIManagerService {
   insertItem(position: UIPosition, componentID: ComponentID): void;
   removeItem(position: UIPosition, componentID: ComponentID): void;
+  setComponentStatus(position: Position, componentID: ComponentID, status: PositionComponentStatus): void;
 }

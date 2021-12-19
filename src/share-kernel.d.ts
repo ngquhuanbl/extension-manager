@@ -79,3 +79,9 @@ interface Message {
 interface MessageEvent {
   data: Message;
 }
+
+type ExtensionStatus = 'ENABLED' | 'DISABLED';
+
+type Position = UIPosition;
+
+type PositionComponentStatus = 'ACTIVE' | 'INACTIVE';

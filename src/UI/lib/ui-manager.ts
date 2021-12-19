@@ -1,6 +1,9 @@
 import Observer, { Conditions } from "../../patterns/observer";
 
-type Position = UIPosition;
+interface PositionComponent {
+  id: ComponentID;
+  status: PositionComponentStatus;
+}
 
 interface UIConditions extends Conditions {
   position: Position;
@@ -15,7 +18,7 @@ interface UIConditions extends Conditions {
    * pos: A hash table keeping track of components located at observed UI positions.
    * Component ID are used to represent a component
    */
-  private pos: Map<Position, Array<ComponentID>>;
+  private pos: Map<Position, Array<PositionComponent>>;
 
 
   private constructor() {
@@ -34,9 +37,9 @@ interface UIConditions extends Conditions {
   /**
    * Return IDs of components located at the given position
    * @param position The UI position string
-   * @returns {Array<string>} IDs of components located at the given position
+   * @returns Position components located at the given position
    */
-  getComponentIDsByPosition(position: Position) {
+  getPositionComponentByPosition(position: Position) {
     return this.pos.get(position) || null;
   }
 
@@ -46,13 +49,18 @@ interface UIConditions extends Conditions {
    * @param componentID The component ID
    */
   insertItem(position: Position, componentID: ComponentID) {
-    const IDList = this.pos.get(position) || [];
+    const componentList = this.pos.get(position) || [];
 
-    if (IDList.includes(componentID)) return;
+    const hasComponentAlreadyInserted = componentList.findIndex(({ id }) => id === componentID) !== -1;
 
-    IDList.push(componentID);
+    if (hasComponentAlreadyInserted) return;
 
-    this.pos.set(position, IDList);
+    componentList.push({
+      id: componentID,
+      status: 'ACTIVE'
+    })
+
+    this.pos.set(position, componentList);
 
     // Notify subscribers
     const conditions: Conditions = {
@@ -67,13 +75,38 @@ interface UIConditions extends Conditions {
    * @param componentID The component ID
    */
   removeItem(position: Position, componentID: ComponentID) {
-    let IDList = this.pos.get(position) || [];
+    let componentList = this.pos.get(position);
 
-    if (!IDList.includes(componentID)) return;
+    if (!componentList) return;
 
-    IDList = IDList.filter((currentId) => currentId !== componentID);
+    const hasComponentAlreadyInserted = componentList.findIndex(({ id }) => id === componentID) !== -1;
 
-    this.pos.set(position, IDList);
+    if (!hasComponentAlreadyInserted) return;
+
+    componentList = componentList.filter(({ id }) => id !== componentID);
+
+    this.pos.set(position, componentList);
+
+    // Notify subscribers
+    const conditions: Conditions = {
+      position,
+    }
+    this.notify(conditions);
+  }
+
+  setComponentStatus(position: Position, componentID: ComponentID, status: PositionComponentStatus) {
+    const componentList = this.pos.get(position);
+
+    if (!componentList) return;
+
+    const componentIndex = componentList.findIndex(({ id }) => id === componentID);
+    const hasComponentAlreadyInserted = componentIndex !== -1;
+
+    if (!hasComponentAlreadyInserted) return;
+
+    componentList[componentIndex].status = status;
+
+    this.pos.set(position, componentList);
 
     // Notify subscribers
     const conditions: Conditions = {

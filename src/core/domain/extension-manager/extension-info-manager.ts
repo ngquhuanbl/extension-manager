@@ -5,6 +5,7 @@ export interface ExtensionInfo extends ExtensionManifestData {
   backgroundURL: string;
   contentURL: string;
   components: Array<ExtensionComponent>;
+  status: ExtensionStatus;
 }
 
 interface ExtensionComponent {
@@ -43,6 +44,20 @@ class ExtensionInfoManager {
 
   getExtensionInfo(id: ExtensionID) {
     return this.extensionInfoMap.get(id) || null;
+  }
+
+
+  updateExtensionInfo(extensionID: ExtensionID, data: Partial<ExtensionInfo>) {
+    const oldExtensionInfo = this.getExtensionInfo(extensionID);
+
+    if (!oldExtensionInfo) return;
+
+    const newExtensionInfo = {
+      ...oldExtensionInfo,
+      ...data
+    }
+
+    this.extensionInfoMap.set(extensionID, newExtensionInfo)
   }
 }
 

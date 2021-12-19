@@ -1,5 +1,7 @@
 import { createStandaloneToast } from "@chakra-ui/toast";
+import { nanoid } from "nanoid";
 import Observer from "patterns/observer";
+// import TokenBucketRateLimit from "patterns/token-bucket-rate-limit";
 import { createAPIPath } from "UI/utils/api";
 import MessageManager, { EXT_MSG_EVENT_TYPE } from "../message-manager";
 import SDK from "../sdk";
@@ -10,13 +12,19 @@ import ExtensionWorkerManager, {
 
 const toast = createStandaloneToast();
 
-
 const CUSTOM_EVENT_TYPES: Record<string, string> = {
   "install-extension": "EXTENSION_MANAGER/INSTALL_EXTENSION",
 };
 
+// const TBRL_KEY_CONTENT_BG_SELF = "TBRL_KEY/CONTENT_BG_SELF";
+// const TBRL_KEY_BG_CONTENT_SELF = "TBRL_KEY/BG_CONTENT_SELF";
+// const TBRL_KEY_CONTENT_BG_OTHER = "TBRL_KEY/CONTENT_BG_OTHER";
+// const TBRL_KEY_BG_BG_OTHER = "TBRL_KEY/BG_BG_OTHER";
+
 class ExtensionManager extends Observer<{ id: ExtensionID }> {
   private static instance: ExtensionManager | null = null;
+
+  private rateLimitMessageQueue: Array<Message> = [];
 
   static getInstance() {
     if (this.instance === null) {
@@ -39,7 +47,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     window.addEventListener(EXT_MSG_EVENT_TYPE, (event: any) => {
       const { detail } = event;
       const message: Message = detail;
-      const { source } = message as { source : ExtSourceOrTarget };
+      const { source } = message as { source: ExtSourceOrTarget };
 
       if (typeof source === "object" && source.type === "ext-bg") {
         let temp = message.source;
@@ -53,17 +61,19 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     });
   }
 
-  static hasExtension = ExtensionInfoManager.getInstance().hasExtensionInfo.bind(
-    ExtensionInfoManager.getInstance()
-  );
+  static hasExtension =
+    ExtensionInfoManager.getInstance().hasExtensionInfo.bind(
+      ExtensionInfoManager.getInstance()
+    );
 
-  static getExtensionInfo = ExtensionInfoManager.getInstance().getExtensionInfo.bind(
-    ExtensionInfoManager.getInstance()
-  );
+  static getExtensionInfo =
+    ExtensionInfoManager.getInstance().getExtensionInfo.bind(
+      ExtensionInfoManager.getInstance()
+    );
 
   static process(data: Message) {
     const { target } = data as { target: ExtSourceOrTarget };
-    if (target.type === 'ext-bg') {
+    if (target.type === "ext-bg") {
       // Dispatch msg to bg script
       const extensionWorkerManager = ExtensionWorkerManager.getInstance();
       return extensionWorkerManager.postMessageToWorker(data);
@@ -72,27 +82,38 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
       const { value } = target;
 
       const customEvent = new CustomEvent(value, {
-        detail: data
-      })
+        detail: data,
+      });
 
       window.dispatchEvent(customEvent);
     }
   }
 
-  static async fetchExtension(extensionID: ExtensionID) {
-    const res = await fetch(
-      createAPIPath(`/extensions?` + new URLSearchParams([["id", extensionID]]))
-    );
-    const { content, background } = await res.json();
-
+  static async fetchExtension(
+    extensionID: ExtensionID,
+    extensionDisplayName: string,
+    contentURL: string,
+    backgroundURL: string,
+    type: "default" | "silent" = "default"
+  ) {
     // Load extension script
     const scriptElement = document.createElement("script");
     scriptElement.type = "text/javascript";
-    scriptElement.src = content;
+    scriptElement.src = contentURL;
 
-    scriptElement.setAttribute(`param-background`, background);
+    scriptElement.setAttribute(`param-background`, backgroundURL);
 
     document.body.appendChild(scriptElement);
+
+    const toastID = nanoid();
+    if (type === "default") {
+      toast({
+        id: toastID,
+        title: `Installing '${extensionDisplayName}' extension ...`,
+        status: "info",
+        isClosable: true,
+      });
+    }
 
     const customEventType = CUSTOM_EVENT_TYPES["install-extension"];
 
@@ -104,6 +125,14 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
 
         if (resMessageID === extensionID) {
           window.removeEventListener(customEventType, listener);
+          if (type === "default") {
+            toast.close(toastID);
+            toast({
+              title: `'${extensionDisplayName}' extension is installed!`,
+              status: "success",
+              isClosable: true,
+            });
+          }
           resolve();
         }
       };
@@ -174,17 +203,37 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
       if (source.value !== target.value) {
         // The message is dispatched to another extension
 
-        const doesTargetExtensionExist = ExtensionManager.hasExtension(target.value);
-        if (!doesTargetExtensionExist)
+        const doesTargetExtensionExist = ExtensionManager.hasExtension(
+          target.value
+        );
+        if (!doesTargetExtensionExist) {
+          const res = await fetch(
+            createAPIPath(
+              `/extensions?` + new URLSearchParams([["id", target.value]])
+            )
+          );
+          const { contentURL, backgroundURL, displayName } = await res.json();
           // Install the other extension if it doesn't exist
-          await ExtensionManager.fetchExtension(target.value);
+          await ExtensionManager.fetchExtension(
+            target.value,
+            displayName,
+            contentURL,
+            backgroundURL
+          );
+        }
 
         // Checking for permission
-        const sourceExtensionInfo = ExtensionManager.getExtensionInfo(source.value);
-        const targetExtensionInfo = ExtensionManager.getExtensionInfo(target.value);
+        const sourceExtensionInfo = ExtensionManager.getExtensionInfo(
+          source.value
+        );
+        const targetExtensionInfo = ExtensionManager.getExtensionInfo(
+          target.value
+        );
 
         if (!sourceExtensionInfo)
-          throw new Error(`Non-existed source extension with id ${source.value}`);
+          throw new Error(
+            `Non-existed source extension with id ${source.value}`
+          );
 
         const { permissions } = sourceExtensionInfo;
 
@@ -208,13 +257,12 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
 
   static dispatchMsgFromExtBGToExtContent(data: Message) {
     try {
-      // TODO: CHECK PERMISSION + RATE LIMIT
+      // CHECK PERMISSION
 
       // Since this scenario only happens with communication within one extension
       // it's passed by default
 
-      // IF PASS, ENQUEUE THE MESSAGE
-      ExtensionManager.enqueueMessage(data);
+      // RATE LIMIT
     } catch (e: any) {
       const { message } = e;
       toast({
@@ -227,7 +275,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
 
   static async dispatchMsgFromExtBGToOtherExtBG(data: Message) {
     try {
-      // TODO: CHECK PERMISSION + RATE LIMIT
+      // CHECK PERMISSION
       const { source, target } = data as {
         source: ExtSourceOrTarget;
         target: ExtSourceOrTarget;
@@ -236,17 +284,37 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
       if (source.value !== target.value) {
         // The message is dispatched to another extension
 
-        const doesTargetExtensionExist = ExtensionManager.hasExtension(target.value);
-        if (!doesTargetExtensionExist)
+        const doesTargetExtensionExist = ExtensionManager.hasExtension(
+          target.value
+        );
+        if (!doesTargetExtensionExist) {
+          const res = await fetch(
+            createAPIPath(
+              `/extensions?` + new URLSearchParams([["id", target.value]])
+            )
+          );
+          const { contentURL, backgroundURL, displayName } = await res.json();
           // Install the other extension if it doesn't exist
-          await ExtensionManager.fetchExtension(target.value);
+          await ExtensionManager.fetchExtension(
+            target.value,
+            displayName,
+            contentURL,
+            backgroundURL
+          );
+        }
 
         // Checking for permission
-        const sourceExtensionInfo = ExtensionManager.getExtensionInfo(source.value);
-        const targetExtensionInfo = ExtensionManager.getExtensionInfo(target.value);
+        const sourceExtensionInfo = ExtensionManager.getExtensionInfo(
+          source.value
+        );
+        const targetExtensionInfo = ExtensionManager.getExtensionInfo(
+          target.value
+        );
 
         if (!sourceExtensionInfo)
-          throw new Error(`Non-existed source extension with id ${source.value}`);
+          throw new Error(
+            `Non-existed source extension with id ${source.value}`
+          );
 
         const { permissions } = sourceExtensionInfo;
 
@@ -268,11 +336,31 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     }
   }
 
+  enqueueAllRateLimitMessages() {
+    this.rateLimitMessageQueue.forEach((message) => {
+      ExtensionManager.enqueueMessage(message);
+    });
+
+    this.rateLimitMessageQueue = [];
+  }
+
   static enqueueMessage(data: Message) {
     const messageManager = MessageManager.getInstance();
     data.meta.handlerKey = EXT_MANAGER_MSG_HANDLER_KEY;
     messageManager.enqueueMessage(data);
   }
+
+  updateExtensionInfo(extensionID: ExtensionID, data: Partial<ExtensionInfo>) {
+    const extensionInfoManager = ExtensionInfoManager.getInstance();
+    extensionInfoManager.updateExtensionInfo(extensionID, data);
+
+    this.notify({ id: extensionID });
+  }
+
+  static terminateExtensionWorker =
+    ExtensionWorkerManager.getInstance().terminateExtensionWorker.bind(
+      ExtensionWorkerManager.getInstance()
+    );
 }
 
 export default ExtensionManager;

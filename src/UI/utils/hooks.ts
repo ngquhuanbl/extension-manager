@@ -9,14 +9,18 @@ export const useUI = () => {
       componentType: ComponentType,
       childrenProps: object = {}
     ) => {
-      const listOfComponentIDs =
-        UIManager.getInstance().getComponentIDsByPosition(position) || [];
+      const listOfPositionComponent =
+        UIManager.getInstance().getPositionComponentByPosition(position) || [];
+
+      const listOfActivePositionComponent = listOfPositionComponent.filter(
+        ({ status }) => status === "ACTIVE"
+      );
 
       const listOfElements: React.ReactElement<
         any,
         string | React.JSXElementConstructor<any>
       >[] = [];
-      listOfComponentIDs.forEach((currentID) => {
+      listOfActivePositionComponent.forEach(({ id: currentID, status }) => {
         const componentData = ComponentRegistry.getInstance().getComponentData(
           componentType,
           currentID
@@ -38,19 +42,25 @@ export const useUI = () => {
       componentType: ComponentType,
       childrenProps: object = {}
     ) => {
-      const listOfComponentIDs =
-        UIManager.getInstance().getComponentIDsByPosition(position) || [];
+      const listOfPositionComponent =
+        UIManager.getInstance().getPositionComponentByPosition(position) || [];
 
-      const numberOfComponentIDs = listOfComponentIDs.length;
-
-      if (numberOfComponentIDs === 0) return null;
-
-      const lastComponentID = listOfComponentIDs[numberOfComponentIDs - 1];
-
-      const lastComponentData = ComponentRegistry.getInstance().getComponentData(
-        componentType,
-        lastComponentID
+      const listOfActivePositionComponent = listOfPositionComponent.filter(
+        ({ status }) => status === "ACTIVE"
       );
+
+      const numberOfActiveComponentIDs = listOfActivePositionComponent.length;
+
+      if (numberOfActiveComponentIDs === 0) return null;
+
+      const { id: lastComponentID } =
+        listOfActivePositionComponent[numberOfActiveComponentIDs - 1];
+
+      const lastComponentData =
+        ComponentRegistry.getInstance().getComponentData(
+          componentType,
+          lastComponentID
+        );
       if (lastComponentData === null) return null;
 
       const { id, component } = lastComponentData;

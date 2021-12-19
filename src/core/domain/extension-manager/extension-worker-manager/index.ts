@@ -1,12 +1,15 @@
+import { createStandaloneToast } from "@chakra-ui/toast";
 import { Subscriber } from "patterns/observer";
 import ExtensionManager from "..";
 import ActivationMap, { EventConditions } from "../../activation-map";
 import ExtensionInfoManager from "../extension-info-manager";
 
+const toast = createStandaloneToast();
+
 export const EXT_MANAGER_MSG_HANDLER_KEY = "MSG_HANDLER/EXT_MANAGER";
 
 export class ExtensionWorker {
-  worker: Worker | null = null;
+  private workerInstance: Worker | null = null;
 
   constructor(public id: ExtensionID) {
     this.id = id;
@@ -16,79 +19,130 @@ export class ExtensionWorker {
   }
 
   setUpActivationEvents() {
-    const extensionInfoManager = ExtensionInfoManager.getInstance();
-
-    const extensionInfo = extensionInfoManager.getExtensionInfo(this.id);
-
-    if (!extensionInfo) throw Error("No extension info found!");
-
-    const { activationEvents } = extensionInfo;
-    const activationMap = ActivationMap.getInstance();
-
-    const registeredSubscribers: Array<Subscriber<EventConditions>> = [];
-    activationEvents.forEach((eventName) => {
-      registeredSubscribers.push(
-        activationMap.subscribeToActivationEvent(
-          eventName,
-          this.startWorker.bind(this)
-        ),
-        activationMap.subscribeToDeactivationEvent(
-          eventName,
-          this.terminateWorker.bind(this)
-        )
-      );
-    });
-
-    this.removeActivationEvents = function () {
-      registeredSubscribers.forEach((subscriber) => {
-        activationMap.unsubscribeToEvent(subscriber);
-      });
-    };
-  }
-
-  removeActivationEvents() {}
-
-  startWorker() {
-    if (!this.worker) {
+    try {
       const extensionInfoManager = ExtensionInfoManager.getInstance();
 
       const extensionInfo = extensionInfoManager.getExtensionInfo(this.id);
 
       if (!extensionInfo) throw Error("No extension info found!");
 
-      const { backgroundURL } = extensionInfo;
+      const { activationEvents } = extensionInfo;
+      const activationMap = ActivationMap.getInstance();
 
-      if (!backgroundURL) return;
+      const registeredSubscribers: Array<Subscriber<EventConditions>> = [];
+      activationEvents.forEach((eventName) => {
+        registeredSubscribers.push(
+          activationMap.subscribeToActivationEvent(
+            eventName,
+            this.start.bind(this)
+          ),
+          activationMap.subscribeToDeactivationEvent(
+            eventName,
+            this.terminate.bind(this)
+          )
+        );
+      });
 
-      this.worker = new Worker("static/js/extension-worker.bundle.js");
-
-
-      this.worker.addEventListener("message", ExtensionManager.onMessage.bind(this));
-
-      const loadBackgroundScriptMessage: WorkerMessage = {
-        type: "LOAD_BACKGROUND_SCRIPT",
-        payload: {
-          endpoint: backgroundURL,
-        },
+      this.removeActivationEvents = function () {
+        registeredSubscribers.forEach((subscriber) => {
+          activationMap.unsubscribeToEvent(subscriber);
+        });
       };
-      this.worker.postMessage(loadBackgroundScriptMessage);
-
-      const activateMessage: WorkerMessage = {
-        type: "ACTIVATE",
-      };
-      this.worker.postMessage(activateMessage);
+    } catch (e: any) {
+      const { message } = e;
+      toast({
+        title: message,
+        status: "error",
+        isClosable: true,
+      });
     }
   }
 
-  terminateWorker() {
-    if (this.worker) {
+  removeActivationEvents() {}
+
+  isActive() {
+    return this.workerInstance !== null;
+  }
+
+  start() {
+    try {
+      if (!this.workerInstance) {
+        const extensionInfoManager = ExtensionInfoManager.getInstance();
+
+        const extensionInfo = extensionInfoManager.getExtensionInfo(this.id);
+
+        if (!extensionInfo) throw Error("No extension info found!");
+
+        const { backgroundURL, status, displayName } = extensionInfo;
+
+        if (status === "DISABLED")
+          throw Error(
+            `'${displayName}' extension is disabled! Request is cancelled!`
+          );
+
+        if (!backgroundURL) return;
+
+        this.workerInstance = new Worker(
+          "static/js/extension-worker.bundle.js"
+        );
+
+        this.workerInstance.addEventListener(
+          "message",
+          ExtensionManager.onMessage.bind(this)
+        );
+
+        const loadBackgroundScriptMessage: WorkerMessage = {
+          type: "LOAD_BACKGROUND_SCRIPT",
+          payload: {
+            endpoint: backgroundURL,
+          },
+        };
+        this.workerInstance.postMessage(loadBackgroundScriptMessage);
+
+        const activateMessage: WorkerMessage = {
+          type: "ACTIVATE",
+        };
+        this.workerInstance.postMessage(activateMessage);
+      }
+    } catch (e: any) {
+      const { message } = e;
+      toast({
+        title: message,
+        status: "error",
+        isClosable: true,
+      });
+    }
+  }
+
+  terminate() {
+    if (this.workerInstance) {
       const deactivateMessage: WorkerMessage = {
         type: "DEACTIVATE",
       };
-      this.worker.postMessage(deactivateMessage);
-      this.worker.terminate();
-      this.worker = null;
+      this.workerInstance.postMessage(deactivateMessage);
+      this.workerInstance.terminate();
+      this.workerInstance = null;
     }
+  }
+
+  postMessage(data: any) {
+    this.workerInstance?.postMessage(data);
+  }
+
+  addEventListener(
+    type: "message" | "messageerror",
+    listener: (this: Worker, ev: MessageEvent<any>) => any,
+    options?: boolean | AddEventListenerOptions | undefined
+  ) {
+    this.workerInstance?.addEventListener(type, listener, options);
+  }
+
+  removeEventListener(
+    type: "message" | "messageerror",
+    listener: (this: Worker, ev: any) => any,
+    options?: boolean | EventListenerOptions | undefined
+  ) {
+    this.workerInstance?.removeEventListener(type, listener, options);
   }
 }
 
@@ -116,14 +170,22 @@ class ExtensionWorkerManager {
     this.extensionWorkerMap.set(id, extensionWorker);
   }
 
+  terminateExtensionWorker(id: ExtensionID) {
+    if (!this.hasExtensionWorker(id)) return;
+
+    const extensionWorker = this.extensionWorkerMap.get(id)!;
+
+    extensionWorker.terminate();
+  }
+
   removeExtensionWorker(id: ExtensionID) {
     if (!this.hasExtensionWorker(id)) return;
 
-    const extension = this.extensionWorkerMap.get(id)!;
+    const extensionWorker = this.extensionWorkerMap.get(id)!;
 
-    extension.terminateWorker();
+    extensionWorker.terminate();
 
-    extension.removeActivationEvents();
+    extensionWorker.removeActivationEvents();
 
     this.extensionWorkerMap.delete(id);
   }
@@ -133,43 +195,50 @@ class ExtensionWorkerManager {
   }
 
   postMessageToWorker(data: Message) {
-    const { target, meta } = data;
-    const { messageID } = meta;
+    try {
+      const { target, meta } = data;
+      const { messageID } = meta;
 
-    let extensionID = (target as ExtSourceOrTarget).value;
+      let extensionID = (target as ExtSourceOrTarget).value;
 
-    const extension = this.getExtensionWorker(extensionID);
+      const extensionWorker = this.getExtensionWorker(extensionID);
 
-    if (!extension)
-      throw new Error(`Non-existed extension with id ${extensionID}`);
+      if (!extensionWorker)
+        throw new Error(`Non-existed extension with id ${extensionID}`);
 
-    let { worker } = extension;
+      if (!extensionWorker.isActive()) {
+        extensionWorker.start();
+        // throw new Error(
+        //   `Non-active worker associated with extension whose id is ${extensionID}`
+        // );
+      }
 
-    if (!worker) {
-      extension.startWorker();
-      worker = extension.worker;
-      // throw new Error(
-      //   `Non-active worker associated with extension whose id is ${extensionID}`
-      // );
-    }
-    worker!.postMessage(data);
+      extensionWorker.postMessage(data);
 
-    const { fireAndForget } = meta;
+      const { fireAndForget } = meta;
 
-    if (!fireAndForget) {
-      // If this message is required to return a result,
-      // then we create a promise to achieve that
-      return new Promise((resolve) => {
-        const listener = (event: any) => {
-          const { data: resData } = event;
-          const { meta: resMeta, payload: resPayload } = resData;
-          const { messageID: resMessageID } = resMeta;
-          if (messageID === resMessageID) {
-            worker!.removeEventListener("message", listener);
-            resolve(resPayload);
-          }
-        };
-        worker!.addEventListener("message", listener);
+      if (!fireAndForget) {
+        // If this message is required to return a result,
+        // then we create a promise to achieve that
+        return new Promise((resolve) => {
+          const listener = (event: any) => {
+            const { data: resData } = event;
+            const { meta: resMeta, payload: resPayload } = resData;
+            const { messageID: resMessageID } = resMeta;
+            if (messageID === resMessageID) {
+              extensionWorker.removeEventListener("message", listener);
+              resolve(resPayload);
+            }
+          };
+          extensionWorker.addEventListener("message", listener);
+        });
+      }
+    } catch (e: any) {
+      const { message } = e;
+      toast({
+        title: message,
+        status: "error",
+        isClosable: true,
       });
     }
   }

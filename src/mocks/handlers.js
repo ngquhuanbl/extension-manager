@@ -6,23 +6,21 @@ const EXTENSIONS = [
   {
     id: "tylerrjoseph-alert-extension",
     displayName: "Alert extension",
-    content: "http://localhost:3001/static/js/content.bundle.js",
-    background: "http://localhost:3001/static/js/background.bundle.js",
+    contentURL: "http://localhost:3001/static/js/content.bundle.js",
+    backgroundURL: "http://localhost:3001/static/js/background.bundle.js",
   },
   {
     id: "joshuadun-image-upload-message-extension",
     displayName: "Image Upload Message extension",
-    content: "http://localhost:3002/static/js/content.bundle.js",
-    background: "http://localhost:3002/static/js/background.bundle.js",
+    contentURL: "http://localhost:3002/static/js/content.bundle.js",
+    backgroundURL: "http://localhost:3002/static/js/background.bundle.js",
   },
 ];
 
 export const handlers = [
   rest.get(createAPIPath("/extensions/all"), (req, res, ctx) => {
     const response = {
-      extensions: EXTENSIONS.map(({ id, displayName }) => ({
-        id, displayName
-      })),
+      extensions: EXTENSIONS,
     };
     return res(ctx.status(200), ctx.json(response));
   }),
