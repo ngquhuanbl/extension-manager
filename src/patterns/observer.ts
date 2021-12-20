@@ -11,7 +11,7 @@ export interface Subscriber<C extends Conditions> {
   subscriber: SubscriberFunction;
 }
 
-class Observer<C extends Conditions> {
+class ObserverWithConditions<C extends Conditions> {
   private subscribers: Array<Subscriber<C>>;
 
   constructor() {
@@ -38,8 +38,8 @@ class Observer<C extends Conditions> {
   }
 
   notifyAll() {
-    this.subscribers.forEach(({ subscriber }) => subscriber());
+    this.subscribers.forEach(({ subscriber }) => { subscriber()});
   }
 }
 
-export default Observer;
+export default ObserverWithConditions;

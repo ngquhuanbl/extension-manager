@@ -3,6 +3,7 @@ import React from "react";
 import ChatToolbarIcon from "./ChatToolbarIcon";
 import ComponentList from "../ComponentList";
 import ExtensionManagerToolbarIcon from "./ExtensionManagerToolbarIcon";
+import ContactToolbarIcon from "./ContactToolbarIcon";
 
 interface Props {
   selectedItem: string;
@@ -24,6 +25,7 @@ const Toolbar: React.FC<Props> = ({ selectedItem, onSelect }) => {
       }}
     >
       <ChatToolbarIcon selectedItem={selectedItem} onSelect={onSelect} />
+      <ContactToolbarIcon selectedItem={selectedItem} onSelect={onSelect} />
       <ExtensionManagerToolbarIcon
         selectedItem={selectedItem}
         onSelect={onSelect}

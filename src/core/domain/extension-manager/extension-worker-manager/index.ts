@@ -114,19 +114,32 @@ export class ExtensionWorker {
     }
   }
 
-  terminate() {
+  async terminate() {
     if (this.workerInstance) {
       const deactivateMessage: WorkerMessage = {
         type: "DEACTIVATE",
       };
       this.workerInstance.postMessage(deactivateMessage);
+
+      // Wait until deactivate function finished
+      await new Promise<void>((resolve) => {
+        const listener = (event: any) => {
+          if (event.data && event.data.type === 'FINISH_DEACTIVATE') {
+            this.removeEventListener('message', listener);
+            resolve();
+          }
+        }
+        this.addEventListener('message', listener);
+      })
       this.workerInstance.terminate();
       this.workerInstance = null;
     }
   }
 
   postMessage(data: any) {
-    this.workerInstance?.postMessage(data);
+    console.log('extension worker manager - postMessage', data);
+    const { result, ...noResultData } = data;
+    this.workerInstance?.postMessage(noResultData);
   }
 
   addEventListener(
@@ -170,20 +183,20 @@ class ExtensionWorkerManager {
     this.extensionWorkerMap.set(id, extensionWorker);
   }
 
-  terminateExtensionWorker(id: ExtensionID) {
+  async terminateExtensionWorker(id: ExtensionID) {
     if (!this.hasExtensionWorker(id)) return;
 
     const extensionWorker = this.extensionWorkerMap.get(id)!;
 
-    extensionWorker.terminate();
+    await extensionWorker.terminate();
   }
 
-  removeExtensionWorker(id: ExtensionID) {
+  async removeExtensionWorker(id: ExtensionID) {
     if (!this.hasExtensionWorker(id)) return;
 
     const extensionWorker = this.extensionWorkerMap.get(id)!;
 
-    extensionWorker.terminate();
+    await extensionWorker.terminate();
 
     extensionWorker.removeActivationEvents();
 

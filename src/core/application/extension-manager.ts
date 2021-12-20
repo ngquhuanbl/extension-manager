@@ -115,7 +115,7 @@ export const installExtension = async (
   );
 };
 
-export const uninstallExtension = (
+export const uninstallExtension = async (
   extensionID: ExtensionID,
   dependencies: Dependencies
 ) => {
@@ -135,7 +135,7 @@ export const uninstallExtension = (
   });
 
   // STEP 2: UNSAVE EXTENSION
-  extensionManager.unsaveExtension(extensionID);
+  await extensionManager.unsaveExtension(extensionID);
 
   // STEP 3: REMOVE PERSISTED DATA
   let installedExtensions = JSON.parse(
@@ -220,3 +220,5 @@ export const getExtensionStatus = (extensionID: ExtensionID) => {
 
   return extensionInfo.status;
 };
+
+export const dispatchMsgFromSDKToExtBG = ExtensionManager.getInstance().dispatchMsgFromSDKToExtBG.bind(ExtensionManager.getInstance());

@@ -4,10 +4,9 @@ import { nanoid } from "nanoid";
 
 addEventListener(
   "message",
-  async function (e) {
+  function (e) {
     const { data: workerMessage } = e;
     const { type, payload } = workerMessage as WorkerMessage;
-
     switch (type) {
       case "LOAD_BACKGROUND_SCRIPT": {
         const { endpoint } = payload;

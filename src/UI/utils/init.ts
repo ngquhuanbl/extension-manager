@@ -85,6 +85,33 @@ export const createDispatchMsgFromExtContentFunction = () => {
 
     if (fireAndForget) {
       processor(data);
+      return Promise.resolve();
+    } else {
+      return new Promise((resolve) => {
+        const req = createReq(data);
+
+        processor(req);
+
+        resolve(req.result);
+      });
+    }
+  };
+};
+
+export const createDispatchMsgFromSDKFunction = () => {
+  const { createReq } = useMessageManager();
+  const { dispatchMsgFromSDKToExtBG } = useExtensionManager();
+
+  // This global function will only be call from content script extension
+  (window as any).dispatchMsgFromSDK = function (data: Message) {
+    const { meta } = data;
+    const { fireAndForget } = meta;
+
+    let processor: GenericFunction = dispatchMsgFromSDKToExtBG;
+
+    if (fireAndForget) {
+      processor(data);
+      return Promise.resolve();
     } else {
       return new Promise((resolve) => {
         const req = createReq(data);

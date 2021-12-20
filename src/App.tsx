@@ -1,16 +1,19 @@
 import { Flex } from "@chakra-ui/react";
-import Extensions from "UI/components/app/Sidebar/Extensions";
 import React, { useEffect, useState } from "react";
-import ChatContent from "UI/components/app/MainContent/ChatContent";
 import {
   createDefineExtFunction,
   createDispatchMsgFromExtContentFunction,
+  createDispatchMsgFromSDKFunction,
   installPersistedExtensions,
 } from "UI/utils/init";
 import Toolbar from "UI/components/app/Toolbar";
 import Sidebar from "UI/components/app/Sidebar";
+import ExtensionManagerSidebarContent from "UI/components/app/Sidebar/ExtensionManagerSidebarContent";
+import ContactSidebarContent from "UI/components/app/Sidebar/ContactSidebarContent";
 import MainContent from "UI/components/app/MainContent";
+import ChatContent from "UI/components/app/MainContent/ChatContent";
 import { componentID as chatExtensionComponentID } from "UI/components/app/Toolbar/ChatToolbarIcon";
+import { componentID as contactExtensionComponentID } from "UI/components/app/Toolbar/ContactToolbarIcon";
 import { componentID as extensionManagerExtensionComponentID } from "UI/components/app/Toolbar/ExtensionManagerToolbarIcon";
 import withActivationEvent from "UI/components/HOCs/withActivationEvent";
 
@@ -25,8 +28,12 @@ const views: Record<
     sidebar: null,
     mainContent: <ChatContent />,
   },
+  [contactExtensionComponentID]: {
+    sidebar: <ContactSidebarContent />,
+    mainContent: null,
+  },
   [extensionManagerExtensionComponentID]: {
-    sidebar: <Extensions />,
+    sidebar: <ExtensionManagerSidebarContent />,
     mainContent: null,
   },
 };
@@ -53,6 +60,7 @@ function App() {
   useEffect(() => {
     createDefineExtFunction();
     createDispatchMsgFromExtContentFunction();
+    createDispatchMsgFromSDKFunction();
     installPersistedExtensions();
   }, []);
 

@@ -1,6 +1,6 @@
 import { createStandaloneToast } from "@chakra-ui/toast";
 import { nanoid } from "nanoid";
-import Observer from "patterns/observer";
+import ObserverWithConditions from "patterns/observer";
 import TokenBucketRateLimit, { BucketOptions } from "patterns/token-bucket-rate-limit";
 // import TokenBucketRateLimit from "patterns/token-bucket-rate-limit";
 import { createAPIPath } from "UI/utils/api";
@@ -21,7 +21,7 @@ const TBRL_KEY_CONTENT_BG = "TBRL_KEY/CONTENT_BG";
 const TBRL_KEY_BG_CONTENT = "TBRL_KEY/BG_CONTENT";
 const TBRL_KEY_BG_BG = "TBRL_KEY/BG_BG";
 
-class ExtensionManager extends Observer<{ id: ExtensionID }> {
+class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
   private static instance: ExtensionManager | null = null;
 
   private rateLimitMessageQueue: Map<string, Array<Message>> = new Map();
@@ -100,6 +100,13 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     const scriptElement = document.createElement("script");
     scriptElement.type = "text/javascript";
     scriptElement.src = contentURL;
+    scriptElement.onerror = function() {
+      toast({
+        title: 'Failed to fetch extension data',
+        status: "error",
+        isClosable: true,
+      })
+    }
 
     scriptElement.setAttribute(`param-background`, backgroundURL);
 
@@ -162,18 +169,18 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
     this.notify({ id });
   }
 
-  unsaveExtension(id: ExtensionID) {
-    const extensionInfoManager = ExtensionInfoManager.getInstance();
-
-    extensionInfoManager.removeExtensionInfo(id);
-
+  async unsaveExtension(id: ExtensionID) {
     const extensionWorkerManager = ExtensionWorkerManager.getInstance();
-    extensionWorkerManager.removeExtensionWorker(id);
+    await extensionWorkerManager.removeExtensionWorker(id);
+
+    const extensionInfoManager = ExtensionInfoManager.getInstance();
+    extensionInfoManager.removeExtensionInfo(id);
 
     this.notify({ id });
   }
 
   static onMessage(event: { data: Message }) {
+
     const { data } = event;
 
     const { target } = data;
@@ -233,7 +240,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
 
         if (!sourceExtensionInfo)
           throw new Error(
-            `Non-existed source extension with id ${source.value}`
+            `Non-existed source extension with id ${source.value || source}`
           );
 
         const { permissions } = sourceExtensionInfo;
@@ -246,6 +253,23 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
 
       // RATE LIMIT
       this.rateLimitMessage(data, TBRL_KEY_CONTENT_BG, { interval: 1000, bucketCapacity: 3 })
+    } catch (e: any) {
+      const { message } = e;
+      toast({
+        title: message,
+        status: "error",
+        isClosable: true,
+      });
+    }
+  }
+
+  dispatchMsgFromSDKToExtBG(data: Message) {
+    try {
+      // CHECK PERMISSION (ALWAYS SKIPPED)
+
+      // RATE LIMIT (ALWAYS SKIPPED)
+      // this.rateLimitMessage(data, TBRL_KEY_CONTENT_BG, { interval: 1000, bucketCapacity: 3 })
+      ExtensionManager.enqueueMessage(data);
     } catch (e: any) {
       const { message } = e;
       toast({
@@ -315,7 +339,7 @@ class ExtensionManager extends Observer<{ id: ExtensionID }> {
 
         if (!sourceExtensionInfo)
           throw new Error(
-            `Non-existed source extension with id ${source.value}`
+            `Non-existed source extension with id ${source.value || source}`
           );
 
         const { permissions } = sourceExtensionInfo;

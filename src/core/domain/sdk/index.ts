@@ -5,6 +5,7 @@ import TokenBucketRateLimit, {
 } from "patterns/token-bucket-rate-limit";
 import ExtensionManager from "../extension-manager";
 import MessageManager from "../message-manager";
+import FriendlistManager, { FriendlistLoader } from "./friendlist-manager";
 import { DialogPermissionInterceptor } from "./interceptors";
 
 const toast = createStandaloneToast();
@@ -28,6 +29,35 @@ const HANDLERS: Record<string, GenericFunction> = {
   "sdk.dialog.showMessageBoxSync": (message: Message) => {
     const { payload } = message;
     return Promise.resolve(window.dialog.showMessageBoxSync(payload));
+  },
+  "sdk.registerFriendlistLoader": (message: Message) => {
+    const { payload, source } = message;
+    const { loaderID } = payload;
+
+    const loader: FriendlistLoader = async () => {
+      const message: Message = {
+        type: "GET_FRIENDLIST",
+        source: "sdk",
+        target: source,
+        payload,
+        meta: {
+          fireAndForget: false,
+        },
+      };
+      const res = await (window as any).dispatchMsgFromSDK(message);
+      return res;
+    };
+
+
+    const friendlistManager = FriendlistManager.getInstance();
+    friendlistManager.registerFriendlist(loaderID, loader);
+  },
+  "sdk.removeFriendlistLoader": (message: Message) => {
+    const { payload } = message;
+    const { loaderID } = payload;
+
+    const friendlistManager = FriendlistManager.getInstance();
+    friendlistManager.removeFriendlist(loaderID);
   },
 };
 
@@ -59,7 +89,9 @@ class SDK {
   process(data: Message) {
     const { type } = data;
 
-    const handler = HANDLERS[type];
+    console.log({type})
+
+    const handler = HANDLERS[type] || function() {};
 
     return handler(data);
   }
@@ -78,10 +110,11 @@ class SDK {
       const { permissions } = extensionInfo;
 
       const interceptedTarget = (data: Message) => {
-        // IF PASS, ENQUEUE THE MESSAGE
-        const messageManager = MessageManager.getInstance();
-        data.meta.handlerKey = SDK_MSG_HANDLER_KEY;
-        messageManager.enqueueMessage(data);
+        // IF PASS, RATE LIMIT THE MESSAGE
+        this.rateLimitMessage(data, {
+          interval: 1000,
+          bucketCapacity: 3,
+        });
       };
 
       const interceptors = this.getInterceptors(type);
@@ -122,8 +155,7 @@ class SDK {
       const { permissions } = extensionInfo;
 
       const interceptedTarget = (data: Message) => {
-        // IF PASS, ENQUEUE THE MESSAGE
-        data.meta.handlerKey = SDK_MSG_HANDLER_KEY;
+        // IF PASS, RATE LIMIT THE MESSAGE
         this.rateLimitMessage(data, {
           interval: 1000,
           bucketCapacity: 3,
@@ -160,7 +192,7 @@ class SDK {
     };
     const bucketKey = `${TBRL_KEY_SDK}_${source.value}`;
     const successTokenCallback = () => {
-      ExtensionManager.enqueueMessage(data);
+      SDK.enqueueMessage(data);
     };
     const preRenewTokenCalback = () => {
       this.enqueueNewRateLimitMessage(bucketKey, data);
@@ -176,6 +208,12 @@ class SDK {
       preRenewTokenCalback,
       postRenewTokenCallback
     );
+  }
+
+  static enqueueMessage(data: Message) {
+    const messageManager = MessageManager.getInstance();
+    data.meta.handlerKey = SDK_MSG_HANDLER_KEY;
+    messageManager.enqueueMessage(data);
   }
 
   enqueueNewRateLimitMessage(key: string, data: Message) {

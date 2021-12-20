@@ -1,4 +1,4 @@
-import Observer, { Conditions, Subscriber } from "../../patterns/observer";
+import ObserverWithConditions, { Conditions, Subscriber } from "../../patterns/observer";
 
 export const EVENT_STATUS_ACTIVE = 'ACTIVE';
 export const EVENT_STATUS_INACTIVE = 'INACTIVE';
@@ -10,7 +10,7 @@ export interface EventConditions extends Conditions {
   eventName: EventName;
 }
 
-class ActivationMap extends Observer<EventConditions> {
+class ActivationMap extends ObserverWithConditions<EventConditions> {
   private static instance: ActivationMap | null = null;
 
   private eventStatusTracking: Map<EventName, EventStatus> = new Map();

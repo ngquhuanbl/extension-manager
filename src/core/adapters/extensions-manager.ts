@@ -6,6 +6,7 @@ import {
   subscribe,
   unsubscribe,
   dispatchMsgFromExtContentToExtBG,
+  dispatchMsgFromSDKToExtBG,
   fetchExtension,
   getExtensionStatus,
   setExtensionStatus,
@@ -22,6 +23,7 @@ export const useExtensionManager = () => {
     subscribe,
     unsubscribe,
     dispatchMsgFromExtContentToExtBG,
+    dispatchMsgFromSDKToExtBG,
     fetchExtension,
     getExtensionStatus,
     setExtensionStatus: (extensionID: ExtensionID, status: ExtensionStatus) =>

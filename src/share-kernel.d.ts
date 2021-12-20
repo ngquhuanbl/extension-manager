@@ -85,3 +85,14 @@ type ExtensionStatus = 'ENABLED' | 'DISABLED';
 type Position = UIPosition;
 
 type PositionComponentStatus = 'ACTIVE' | 'INACTIVE';
+
+interface FriendInfo {
+  id: string;
+  name: string;
+  avatar: string;
+  from?: {
+    id: string;
+    name: string;
+    avatar: string;
+  };
+}
