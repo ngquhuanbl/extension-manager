@@ -89,3 +89,21 @@ interface FriendInfo {
     avatar: string;
   };
 }
+
+interface ExtensionComponent {
+  position: UIPosition;
+  type: ComponentType;
+  id: ExtensionComponentID;
+}
+
+interface ExtensionInfo extends ExtensionManifestData {
+  id: ExtensionID;
+  backgroundURL: string;
+  contentURL: string;
+  components: Array<ExtensionComponent>;
+  status: ExtensionStatus;
+}
+
+type PersistedExtensionData = Pick<ExtensionInfo, 'displayName' | 'contentURL' | 'backgroundURL' | 'status'>;
+
+type PersistedExtensionDataStorage = Record<ExtensionID, PersistedExtensionData>;

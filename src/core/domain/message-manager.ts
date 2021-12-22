@@ -67,7 +67,7 @@ class MessageManager {
           `No message handler found for handler key of value ${handlerKey}`
         );
 
-      const res = handlerFunc(data);
+      const res = await handlerFunc(data);
 
       return res;
     } catch (e: any) {

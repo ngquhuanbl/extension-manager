@@ -48,7 +48,7 @@ interface UIConditions extends Conditions {
    * @param position The UI position string
    * @param componentID The component ID
    */
-  insertItem(position: Position, componentID: ComponentID) {
+  insertItem(position: Position, componentID: ComponentID, initialStatus: PositionComponentStatus = 'ACTIVE') {
     const componentList = this.pos.get(position) || [];
 
     const hasComponentAlreadyInserted = componentList.findIndex(({ id }) => id === componentID) !== -1;
@@ -57,7 +57,7 @@ interface UIConditions extends Conditions {
 
     componentList.push({
       id: componentID,
-      status: 'ACTIVE'
+      status: initialStatus
     })
 
     this.pos.set(position, componentList);

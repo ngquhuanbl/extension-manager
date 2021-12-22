@@ -1,19 +1,3 @@
-
-
-export interface ExtensionInfo extends ExtensionManifestData {
-  id: ExtensionID;
-  backgroundURL: string;
-  contentURL: string;
-  components: Array<ExtensionComponent>;
-  status: ExtensionStatus;
-}
-
-interface ExtensionComponent {
-  position: UIPosition;
-  type: ComponentType;
-  id: ExtensionComponentID;
-}
-
 class ExtensionInfoManager {
   private static instance: ExtensionInfoManager | null = null;
 

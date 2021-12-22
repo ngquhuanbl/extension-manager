@@ -6,7 +6,7 @@ import TokenBucketRateLimit, { BucketOptions } from "patterns/token-bucket-rate-
 import { createAPIPath } from "UI/utils/api";
 import MessageManager, { CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG } from "../message-manager";
 import SDK from "../sdk";
-import ExtensionInfoManager, { ExtensionInfo } from "./extension-info-manager";
+import ExtensionInfoManager from "./extension-info-manager";
 import ExtensionWorkerManager, {
   EXT_MANAGER_MSG_HANDLER_KEY,
 } from "./extension-worker-manager";
@@ -44,7 +44,7 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
     );
 
     // Forward handling result from messange manager to worker
-    window.addEventListener(CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG, (event: any) => {
+    window.addEventListener(CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG, async (event: any) => {
       const { detail } = event;
       const message: Message = detail;
       const { source } = message as { source: ExtSourceOrTarget };
@@ -56,7 +56,7 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
 
         message.meta.fireAndForget = true;
 
-        ExtensionManager.process(message);
+        await ExtensionManager.process(message);
       }
     });
   }
@@ -86,6 +86,8 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
       });
 
       window.dispatchEvent(customEvent);
+
+      return Promise.resolve();
     }
   }
 
@@ -94,7 +96,8 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
     extensionDisplayName: string,
     contentURL: string,
     backgroundURL: string,
-    type: "default" | "silent" = "default"
+    type: "default" | "silent" = "default",
+    initialExtensionStatus: ExtensionStatus = 'ENABLED'
   ) {
     // Load extension script
     const scriptElement = document.createElement("script");
@@ -109,6 +112,7 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
     }
 
     scriptElement.setAttribute(`param-background`, backgroundURL);
+    scriptElement.setAttribute(`param-init-ext-status`, initialExtensionStatus);
 
     document.body.appendChild(scriptElement);
 
@@ -119,6 +123,7 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
         title: `Installing '${extensionDisplayName}' extension ...`,
         status: "info",
         isClosable: true,
+        duration: 2000
       });
     }
 
@@ -138,6 +143,7 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
               title: `'${extensionDisplayName}' extension is installed!`,
               status: "success",
               isClosable: true,
+              duration: 2000
             });
           }
           resolve();
@@ -147,14 +153,14 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
     });
   }
 
-  saveExtension(data: ExtensionInfo) {
+  async saveExtension(data: ExtensionInfo) {
     const { id } = data;
 
     const extensionInfoManager = ExtensionInfoManager.getInstance();
     extensionInfoManager.saveExtensionInfo(data);
 
     const extensionWorkerManager = ExtensionWorkerManager.getInstance();
-    extensionWorkerManager.registerExtensionWorker(id);
+    await extensionWorkerManager.registerExtensionWorker(id);
 
     const installExtEventType = CUSTOM_EVENT_TYPES["install-extension"];
     const customEvent = new CustomEvent(installExtEventType, {

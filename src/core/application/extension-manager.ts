@@ -1,10 +1,9 @@
 import { createStandaloneToast } from "@chakra-ui/toast";
-import ExtensionInfoManager, {
-  ExtensionInfo,
-} from "core/domain/extension-manager/extension-info-manager";
+import ExtensionInfoManager from "core/domain/extension-manager/extension-info-manager";
 import withLazyCurrentRoot from "UI/components/HOCs/withLazyCurrentRoot";
 import withLazyLegacyRoot from "UI/components/HOCs/withLazyLegacyRoot";
 import withLegacyRoot from "UI/components/HOCs/withLegacyRoot";
+import { extensionStatus2PositionComponentStatus } from "UI/utils/extensions";
 import ExtensionManager from "../domain/extension-manager";
 import { ComponentRegistryService, UIManagerService } from "./ports";
 
@@ -42,7 +41,7 @@ export const installExtension = async (
 ) => {
   const { componentRegistry, uiManager } = dependencies;
 
-  const { id, createLegacyRoot, components } = extensionData;
+  const { id, createLegacyRoot, components, status } = extensionData;
 
   // STEP 1: APPLY CONTENT SCRIPT
   const extensionID = id;
@@ -78,7 +77,7 @@ export const installExtension = async (
       default:
     }
     // 1.2. Insert extension components to their corresponding positions
-    uiManager.insertItem(position, componentID);
+    uiManager.insertItem(position, componentID, extensionStatus2PositionComponentStatus(status));
 
     // 1.3. Add generated ID to component data
     return {
@@ -92,21 +91,21 @@ export const installExtension = async (
   const extensionInfo: ExtensionInfo = {
     ...extensionData,
     components: componentsWithIDs,
-    status: "ENABLED",
   };
 
   const extensionManager = ExtensionManager.getInstance();
-  extensionManager.saveExtension(extensionInfo);
+  await extensionManager.saveExtension(extensionInfo);
 
   // STEP 3: PERSIST DATA
   const installedExtensions = JSON.parse(
     window.localStorage.getItem("extensions") || `{}`
-  );
+  ) as PersistedExtensionDataStorage;
 
   installedExtensions[extensionID] = {
     displayName: extensionInfo.displayName,
     contentURL: extensionInfo.contentURL,
     backgroundURL: extensionInfo.backgroundURL,
+    status: extensionInfo.status,
   };
 
   window.localStorage.setItem(
@@ -140,7 +139,7 @@ export const uninstallExtension = async (
   // STEP 3: REMOVE PERSISTED DATA
   let installedExtensions = JSON.parse(
     window.localStorage.getItem("extensions") || `{}`
-  );
+  ) as PersistedExtensionDataStorage;
 
   delete installedExtensions[extensionID];
 
@@ -154,6 +153,7 @@ export const uninstallExtension = async (
     title: `'${extensionInfo.displayName}' extension is uninstalled!`,
     status: "success",
     isClosable: true,
+    duration: 2000,
   });
 };
 
@@ -190,27 +190,30 @@ export const setExtensionStatus = async (
   if (extensionInfo) {
     const { components } = extensionInfo;
     components.forEach(({ position, id }) => {
-      let positionComponentStatus: PositionComponentStatus = "ACTIVE";
-
-      switch (status) {
-        case "ENABLED": {
-          positionComponentStatus = "ACTIVE";
-          break;
-        }
-        case "DISABLED": {
-          positionComponentStatus = "INACTIVE";
-          break;
-        }
-      }
+      const positionComponentStatus: PositionComponentStatus =
+        extensionStatus2PositionComponentStatus(status);
 
       uiManager.setComponentStatus(position, id, positionComponentStatus);
     });
 
     // STEP 3: TERMINATE EXTENSION WORKER
-    if (status === 'DISABLED')
+    if (status === "DISABLED")
       await ExtensionManager.terminateExtensionWorker(extensionID);
   }
 
+  // STEP 4: UPDATE PERSISTED DATA
+  let installedExtensions = JSON.parse(
+    window.localStorage.getItem("extensions") || `{}`
+  ) as PersistedExtensionDataStorage;
+
+  if (installedExtensions[extensionID]) {
+    installedExtensions[extensionID].status = status;
+  }
+
+  window.localStorage.setItem(
+    "extensions",
+    JSON.stringify(installedExtensions)
+  );
 };
 
 export const getExtensionStatus = (extensionID: ExtensionID) => {
@@ -223,4 +226,7 @@ export const getExtensionStatus = (extensionID: ExtensionID) => {
   return extensionInfo.status;
 };
 
-export const dispatchMsgFromSDKToExtBG = ExtensionManager.getInstance().dispatchMsgFromSDKToExtBG.bind(ExtensionManager.getInstance());
+export const dispatchMsgFromSDKToExtBG =
+  ExtensionManager.getInstance().dispatchMsgFromSDKToExtBG.bind(
+    ExtensionManager.getInstance()
+  );

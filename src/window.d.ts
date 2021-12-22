@@ -6,6 +6,8 @@ interface Window {
       options: OpenDialogOptions
     ) => Promise<OpenDialogReturnValue>;
   };
+  dispatchMsgFromSDK(data: Message): Promise<any>;
+  dispatchMsgFromExtContent(data: Message): Promise<any>;
 }
 
 interface MessageBoxReturnValue {

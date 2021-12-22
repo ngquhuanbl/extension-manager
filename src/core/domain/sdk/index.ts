@@ -44,13 +44,15 @@ const HANDLERS: Record<string, GenericFunction> = {
           fireAndForget: false,
         },
       };
-      const res = await (window as any).dispatchMsgFromSDK(message);
+      const res = await window.dispatchMsgFromSDK(message);
       return res;
     };
 
+    const extensionID = typeof source === 'object' ? source.value : undefined;
+
 
     const friendlistManager = FriendlistManager.getInstance();
-    friendlistManager.registerFriendlist(loaderID, loader);
+    friendlistManager.registerFriendlist(loaderID, loader, extensionID);
   },
   "sdk.removeFriendlistLoader": (message: Message) => {
     const { payload } = message;

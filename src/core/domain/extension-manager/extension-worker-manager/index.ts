@@ -12,14 +12,17 @@ export const EXT_MANAGER_MSG_HANDLER_KEY = "MSG_HANDLER/EXT_MANAGER";
 export class ExtensionWorker {
   private workerInstance: Worker | null = null;
 
-  constructor(public id: ExtensionID) {
+  private constructor(public id: ExtensionID) {
     this.id = id;
-
-    // Set up activation events
-    this.setUpActivationEvents();
   }
 
-  setUpActivationEvents() {
+  static async createWorker(id: ExtensionID) {
+    const instance = new ExtensionWorker(id);
+    await instance.setUpActivationEvents();
+    return instance;
+  }
+
+  async setUpActivationEvents() {
     try {
       const extensionInfoManager = ExtensionInfoManager.getInstance();
 
@@ -31,18 +34,19 @@ export class ExtensionWorker {
       const activationMap = ActivationMap.getInstance();
 
       const registeredSubscribers: Array<Subscriber<EventConditions>> = [];
-      activationEvents.forEach((eventName) => {
+
+      for (const eventName of activationEvents) {
         registeredSubscribers.push(
-          activationMap.subscribeToActivationEvent(
+          await activationMap.subscribeToActivationEvent(
             eventName,
             this.start.bind(this)
           ),
-          activationMap.subscribeToDeactivationEvent(
+          await activationMap.subscribeToDeactivationEvent(
             eventName,
             this.terminate.bind(this)
           )
         );
-      });
+      }
 
       this.removeActivationEvents = function () {
         registeredSubscribers.forEach((subscriber) => {
@@ -74,12 +78,9 @@ export class ExtensionWorker {
 
         if (!extensionInfo) throw Error("No extension info found!");
 
-        const { backgroundURL, status, displayName } = extensionInfo;
+        const { backgroundURL, status } = extensionInfo;
 
-        if (status === "DISABLED")
-          throw Error(
-            `'${displayName}' extension is disabled! Request is cancelled!`
-          );
+        if (status === "DISABLED") return;
 
         if (!backgroundURL) return;
 
@@ -109,7 +110,8 @@ export class ExtensionWorker {
             fireAndForget: false,
           },
         };
-        await this.postMessageAndAwait(loadBackgroundScriptMessage);
+        this.postMessageAndAwait(loadBackgroundScriptMessage);
+        // await window.dispatchMsgFromSDK(loadBackgroundScriptMessage);
 
         const activateMessage: Message = {
           type: "ACTIVATE",
@@ -125,7 +127,7 @@ export class ExtensionWorker {
             fireAndForget: false,
           },
         };
-        await this.postMessageAndAwait(activateMessage);
+        this.postMessageAndAwait(activateMessage);
       }
     } catch (e: any) {
       const { message } = e;
@@ -137,14 +139,28 @@ export class ExtensionWorker {
     }
   }
 
+  async startForPostMessage() {
+    const extensionInfoManager = ExtensionInfoManager.getInstance();
+
+    const extensionInfo = extensionInfoManager.getExtensionInfo(this.id);
+
+    if (!extensionInfo) throw Error("No extension info found!");
+
+    const { status, displayName } = extensionInfo;
+
+    if (status === "DISABLED")
+      throw Error(
+        `'${displayName}' extension is disabled! Request is cancelled!`
+      );
+
+    this.start();
+  }
+
   async terminate() {
     if (this.workerInstance) {
       const deactivateMessage: Message = {
         type: "DEACTIVATE",
-        source: {
-          type: "ext-bg",
-          value: this.id,
-        },
+        source: "sdk",
         target: {
           type: "ext-bg",
           value: this.id,
@@ -153,7 +169,7 @@ export class ExtensionWorker {
           fireAndForget: false,
         },
       };
-      await this.postMessageAndAwait(deactivateMessage);
+      this.postMessageAndAwait(deactivateMessage);
       this.workerInstance.terminate();
       this.workerInstance = null;
     }
@@ -220,10 +236,10 @@ class ExtensionWorkerManager {
     return this.extensionWorkerMap.has(id);
   }
 
-  registerExtensionWorker(id: ExtensionID) {
+  async registerExtensionWorker(id: ExtensionID) {
     if (this.hasExtensionWorker(id)) return;
 
-    const extensionWorker = new ExtensionWorker(id);
+    const extensionWorker = await ExtensionWorker.createWorker(id);
 
     this.extensionWorkerMap.set(id, extensionWorker);
   }
@@ -252,7 +268,7 @@ class ExtensionWorkerManager {
     return this.extensionWorkerMap.get(id) || null;
   }
 
-  postMessageToWorker(data: Message) {
+  async postMessageToWorker(data: Message) {
     try {
       const { target, meta } = data;
       const { messageID } = meta;
@@ -262,10 +278,10 @@ class ExtensionWorkerManager {
       const extensionWorker = this.getExtensionWorker(extensionID);
 
       if (!extensionWorker)
-        throw new Error(`Non-existed extension with id ${extensionID}`);
+        throw new Error(`Non-existed extension worker with id ${extensionID}`);
 
       if (!extensionWorker.isActive()) {
-        extensionWorker.start();
+        await extensionWorker.startForPostMessage();
         // throw new Error(
         //   `Non-active worker associated with extension whose id is ${extensionID}`
         // );

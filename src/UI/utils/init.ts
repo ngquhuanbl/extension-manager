@@ -32,6 +32,8 @@ export const createDefineExtFunction = () => {
 
     const contentURL = currentScript.getAttribute("src");
     const backgroundURL = currentScript.getAttribute("param-background");
+    const initialExtensionStatus = currentScript.getAttribute("param-init-ext-status");
+
     if (!backgroundURL) return;
 
     return Promise.all(
@@ -56,6 +58,7 @@ export const createDefineExtFunction = () => {
         id: extensionID,
         backgroundURL,
         contentURL,
+        status: initialExtensionStatus
       };
       installExtension(extensionData);
     });
@@ -109,8 +112,7 @@ export const createDispatchMsgFromSDKFunction = () => {
     let processor: GenericFunction = dispatchMsgFromSDKToExtBG;
 
     if (fireAndForget) {
-      processor(data);
-      return Promise.resolve();
+      return Promise.resolve(processor(data));
     } else {
       return new Promise((resolve) => {
         const { result, ...req } = createReq(data);
@@ -128,11 +130,11 @@ export const installPersistedExtensions = () => {
   const { fetchExtension } = useExtensionManager();
   const installedExtensions = JSON.parse(
     window.localStorage.getItem("extensions") || `{}`
-  );
+  ) as PersistedExtensionDataStorage;
 
   Object.entries(installedExtensions).forEach(
-    ([id, { displayName, contentURL, backgroundURL }]: [any, any]) => {
-      fetchExtension(id, displayName, contentURL, backgroundURL, "silent");
+    ([id, { displayName, contentURL, backgroundURL, status }]) => {
+      fetchExtension(id, displayName, contentURL, backgroundURL, "silent", status);
     }
   );
 };
