@@ -20,8 +20,6 @@ const ContactSidebarContent: React.FC = () => {
     fetchData();
   }, []);
 
-  console.log('re-render')
-
   if (loading)
     return (
       <Center h="100px">
@@ -35,7 +33,7 @@ const ContactSidebarContent: React.FC = () => {
     );
 
   return (
-    <VStack spacing="24px" padding="16px">
+    <VStack spacing="24px" padding="16px" maxHeight="100vh" overflow="auto">
       {data.map((item) => (
         <FriendInfoItem key={item.id} {...item} />
       ))}
@@ -47,8 +45,12 @@ export default withSubscribedRender(
   withActivationEvent(ContactSidebarContent, "onView:contactSidebarContent"),
   [
     [
-      FriendlistManager.getInstance().subscribe.bind(FriendlistManager.getInstance()),
-      FriendlistManager.getInstance().unsubscribe.bind(FriendlistManager.getInstance()),
+      FriendlistManager.getInstance().subscribe.bind(
+        FriendlistManager.getInstance()
+      ),
+      FriendlistManager.getInstance().unsubscribe.bind(
+        FriendlistManager.getInstance()
+      ),
     ],
   ]
 );

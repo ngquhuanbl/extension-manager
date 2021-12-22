@@ -35,12 +35,6 @@ interface Root {
   unmount(): void;
 }
 
-type WorkerMessage = Pick<Message, "payload" | "type"> & {
-  meta?: {
-    messageID: string;
-  };
-};
-
 type EventName = string;
 
 type Permission = "dialog" | "bluetooth" | ExtensionID;
@@ -53,8 +47,7 @@ interface ExtensionManifestData {
   activationEvents: string[];
 }
 
-type SDKMessage = Pick<WorkerMessage, "context" | "messageData"> &
-  Pick<ExtensionManifestData, "permissions">;
+type PermissionMessage = Message & Pick<ExtensionManifestData, "permissions">;
 
 type MESSAGE_HANDLER_KEY = "SDK" | "EXT_MANAGER";
 
@@ -80,11 +73,11 @@ interface MessageEvent {
   data: Message;
 }
 
-type ExtensionStatus = 'ENABLED' | 'DISABLED';
+type ExtensionStatus = "ENABLED" | "DISABLED";
 
 type Position = UIPosition;
 
-type PositionComponentStatus = 'ACTIVE' | 'INACTIVE';
+type PositionComponentStatus = "ACTIVE" | "INACTIVE";
 
 interface FriendInfo {
   id: string;

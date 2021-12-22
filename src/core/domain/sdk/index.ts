@@ -89,8 +89,6 @@ class SDK {
   process(data: Message) {
     const { type } = data;
 
-    console.log({type})
-
     const handler = HANDLERS[type] || function() {};
 
     return handler(data);

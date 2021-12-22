@@ -4,21 +4,25 @@ import { nanoid } from "nanoid";
 
 addEventListener(
   "message",
-  function (e) {
-    const { data: workerMessage } = e;
-    const { type, payload } = workerMessage as WorkerMessage;
+  async function (e: { data: Message }) {
+    const { data } = e;
+    const { type, payload } = data;
+
     switch (type) {
       case "LOAD_BACKGROUND_SCRIPT": {
         const { endpoint } = payload;
         importScripts(endpoint);
+        (self as any).postCorrespondingResponse(data);
         break;
       }
       case "ACTIVATE": {
-        (self as any).activate();
+        await (self as any).activate();
+        (self as any).postCorrespondingResponse(data);
         break;
       }
       case "DEACTIVATE": {
-        (self as any).deactivate();
+        await (self as any).deactivate();
+        (self as any).postCorrespondingResponse(data);
         break;
       }
       default: {
@@ -28,13 +32,25 @@ addEventListener(
   false
 );
 
-// function dispatchMsgFromExtBG(data: Message) {
+(self as any).postCorrespondingResponse = function (data: Message) {
+  const { type, source: requestSource, target: requestTarget } = data;
+  const responseType = `${type}_RESPONSE`;
+
+  const responseMessage = {
+    ...data,
+    type: responseType,
+    source: requestTarget,
+    target: requestSource,
+  };
+  (self as any).postMessage(responseMessage);
+};
+
 (self as any).dispatchMsgFromExtBG = function (data: Message) {
-  const { source, meta } = data;
+  const { source, meta, type: requestType } = data;
   const { fireAndForget } = meta;
 
   let processor: GenericFunction = (data: Message) => {
-    postMessage(data);
+    return Promise.resolve(postMessage(data));
   };
 
   try {
@@ -47,12 +63,14 @@ addEventListener(
 
         const listener = (event: any) => {
           const { data: resData } = event;
-          const { meta: resMeta, payload } = resData;
+          const { type: responseType, meta: resMeta, payload } = resData;
           const { messageID: resMessageID } = resMeta;
 
-          if (resMessageID === messageID) {
-            self.removeEventListener("message", listener);
-            resolve(payload);
+          if (responseType === `${requestType}_RESPONSE`) {
+            if (resMessageID === messageID) {
+              self.removeEventListener("message", listener);
+              resolve(payload);
+            }
           }
         };
         self.addEventListener("message", listener);

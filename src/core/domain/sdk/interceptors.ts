@@ -1,8 +1,8 @@
 import { Interceptor } from "patterns/intercepting-filter";
 
 export class DialogPermissionInterceptor extends Interceptor {
-  preProcess(sdkMessage: SDKMessage) {
-    const { permissions } = sdkMessage;
+  preProcess(message: PermissionMessage) {
+    const { permissions } = message;
 
     if (permissions && permissions.includes("dialog")) return;
 

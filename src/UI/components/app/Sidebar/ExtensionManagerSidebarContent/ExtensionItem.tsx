@@ -28,12 +28,12 @@ const Extension: React.FC<Props> = ({
 
   const extensionStatus = getExtensionStatus(id);
 
-  const handleEnableExtension = useCallback(() => {
-    setExtensionStatus(id, "ENABLED");
+  const handleEnableExtension = useCallback(async () => {
+    await setExtensionStatus(id, "ENABLED");
   }, [id, setExtensionStatus]);
 
-  const handleDisableExtension = useCallback(() => {
-    setExtensionStatus(id, "DISABLED");
+  const handleDisableExtension = useCallback(async () => {
+    await setExtensionStatus(id, "DISABLED");
   }, [id, setExtensionStatus]);
 
   const extensionStatusButton = useMemo(() => {

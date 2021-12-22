@@ -14,7 +14,6 @@ const defaultExtensionDependencies = {
   "react-dom": import("react-dom"),
 } as Record<string, Promise<any>>;
 
-
 export const createDefineExtFunction = () => {
   (window as any).defineExt = function () {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -56,7 +55,7 @@ export const createDefineExtFunction = () => {
         ...extensionContentData,
         id: extensionID,
         backgroundURL,
-        contentURL
+        contentURL,
       };
       installExtension(extensionData);
     });
@@ -88,11 +87,11 @@ export const createDispatchMsgFromExtContentFunction = () => {
       return Promise.resolve();
     } else {
       return new Promise((resolve) => {
-        const req = createReq(data);
+        const { result, ...req } = createReq(data);
 
         processor(req);
 
-        resolve(req.result);
+        resolve(result);
       });
     }
   };
@@ -114,11 +113,11 @@ export const createDispatchMsgFromSDKFunction = () => {
       return Promise.resolve();
     } else {
       return new Promise((resolve) => {
-        const req = createReq(data);
+        const { result, ...req } = createReq(data);
 
         processor(req);
 
-        resolve(req.result);
+        resolve(result);
       });
     }
   };

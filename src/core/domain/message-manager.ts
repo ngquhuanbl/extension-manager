@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 
 const toast = createStandaloneToast();
 
-export const EXT_MSG_EVENT_TYPE = "EXT_MSG";
+export const CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG = "CUSTOM_EVENT_TYPE/EXT_AWAIT_MSG";
 
 const MESSAGE_QUEUE_INTERVAL = 200;
 
@@ -30,15 +30,16 @@ class MessageManager {
         const res = await this.handleMessage(message);
 
         // Return the result to the message sender
-        const { meta } = message;
+        const { type: requestType, meta } = message;
         const { fireAndForget } = meta;
         if (!fireAndForget) {
           const resMessage: Message = {
             ...message,
             payload: res,
+            type: `${requestType}_RESPONSE`
           };
 
-          const customEvent = new CustomEvent(EXT_MSG_EVENT_TYPE, {
+          const customEvent = new CustomEvent(CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG, {
             detail: resMessage,
           });
           window.dispatchEvent(customEvent);
@@ -80,6 +81,8 @@ class MessageManager {
   }
 
   createReq(data: Message) {
+    const { type: requestType } = data;
+
     const messageID = nanoid();
     return {
       ...data,
@@ -89,15 +92,17 @@ class MessageManager {
       result: new Promise((resolve) => {
         const listener = (event: any) => {
           const { detail: resData } = event;
-          const { meta: resMeta, payload } = resData;
+          const { type: responseType, meta: resMeta, payload } = resData;
           const { messageID: resMessageID } = resMeta;
 
-          if (resMessageID === messageID) {
-            window.removeEventListener(EXT_MSG_EVENT_TYPE, listener);
-            resolve(payload);
+          if (responseType === `${requestType}_RESPONSE`) {
+            if (resMessageID === messageID) {
+              window.removeEventListener(CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG, listener);
+              resolve(payload);
+            }
           }
         };
-        window.addEventListener(EXT_MSG_EVENT_TYPE, listener);
+        window.addEventListener(CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG, listener);
       }),
     };
   }

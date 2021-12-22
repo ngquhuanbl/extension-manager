@@ -1,4 +1,5 @@
 import { createStandaloneToast } from "@chakra-ui/toast";
+import { nanoid } from "nanoid";
 import { Subscriber } from "patterns/observer";
 import ExtensionManager from "..";
 import ActivationMap, { EventConditions } from "../../activation-map";
@@ -64,7 +65,7 @@ export class ExtensionWorker {
     return this.workerInstance !== null;
   }
 
-  start() {
+  async start() {
     try {
       if (!this.workerInstance) {
         const extensionInfoManager = ExtensionInfoManager.getInstance();
@@ -91,18 +92,40 @@ export class ExtensionWorker {
           ExtensionManager.onMessage
         );
 
-        const loadBackgroundScriptMessage: WorkerMessage = {
+        const loadBackgroundScriptMessage: Message = {
           type: "LOAD_BACKGROUND_SCRIPT",
           payload: {
             endpoint: backgroundURL,
           },
+          source: {
+            type: "ext-bg",
+            value: this.id,
+          },
+          target: {
+            type: "ext-bg",
+            value: this.id,
+          },
+          meta: {
+            fireAndForget: false,
+          },
         };
-        this.workerInstance.postMessage(loadBackgroundScriptMessage);
+        await this.postMessageAndAwait(loadBackgroundScriptMessage);
 
-        const activateMessage: WorkerMessage = {
+        const activateMessage: Message = {
           type: "ACTIVATE",
+          source: {
+            type: "ext-bg",
+            value: this.id,
+          },
+          target: {
+            type: "ext-bg",
+            value: this.id,
+          },
+          meta: {
+            fireAndForget: false,
+          },
         };
-        this.workerInstance.postMessage(activateMessage);
+        await this.postMessageAndAwait(activateMessage);
       }
     } catch (e: any) {
       const { message } = e;
@@ -116,30 +139,52 @@ export class ExtensionWorker {
 
   async terminate() {
     if (this.workerInstance) {
-      const deactivateMessage: WorkerMessage = {
+      const deactivateMessage: Message = {
         type: "DEACTIVATE",
+        source: {
+          type: "ext-bg",
+          value: this.id,
+        },
+        target: {
+          type: "ext-bg",
+          value: this.id,
+        },
+        meta: {
+          fireAndForget: false,
+        },
       };
-      this.workerInstance.postMessage(deactivateMessage);
-
-      // Wait until deactivate function finished
-      await new Promise<void>((resolve) => {
-        const listener = (event: any) => {
-          if (event.data && event.data.type === 'FINISH_DEACTIVATE') {
-            this.removeEventListener('message', listener);
-            resolve();
-          }
-        }
-        this.addEventListener('message', listener);
-      })
+      await this.postMessageAndAwait(deactivateMessage);
       this.workerInstance.terminate();
       this.workerInstance = null;
     }
   }
 
   postMessage(data: any) {
-    console.log('extension worker manager - postMessage', data);
-    const { result, ...noResultData } = data;
-    this.workerInstance?.postMessage(noResultData);
+    this.workerInstance?.postMessage(data);
+  }
+
+  postMessageAndAwait(data: Message) {
+    const { type: requestType } = data;
+    const messageID = nanoid();
+
+    data.meta.messageID = messageID;
+
+    this.postMessage(data);
+
+    return new Promise((resolve) => {
+      const listener = (event: any) => {
+        const { data } = event;
+        const { type: responseType, meta, payload } = data;
+
+        if (responseType === `${requestType}_RESPONSE`) {
+          if (meta && meta.messageID === messageID) {
+            this.removeEventListener("message", listener);
+            resolve(payload);
+          }
+        }
+      };
+      this.addEventListener("message", listener);
+    });
   }
 
   addEventListener(
@@ -245,6 +290,8 @@ class ExtensionWorkerManager {
           };
           extensionWorker.addEventListener("message", listener);
         });
+      } else {
+        return Promise.resolve();
       }
     } catch (e: any) {
       const { message } = e;

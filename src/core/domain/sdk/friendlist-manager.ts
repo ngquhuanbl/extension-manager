@@ -27,8 +27,6 @@ class FriendlistManager extends ObserverWithConditions<{}> {
   registerFriendlist(id: FriendlistID, loader: FriendlistLoader) {
     this.loaders.set(id, loader);
 
-    console.log('register loaderID', id);
-
     this.notifyAll();
   }
 

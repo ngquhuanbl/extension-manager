@@ -172,7 +172,7 @@ export const dispatchMsgFromExtContentToExtBG =
 
 export const fetchExtension = ExtensionManager.fetchExtension;
 
-export const setExtensionStatus = (
+export const setExtensionStatus = async (
   extensionID: ExtensionID,
   status: ExtensionStatus,
   dependencies: Pick<Dependencies, "uiManager">
@@ -205,10 +205,12 @@ export const setExtensionStatus = (
 
       uiManager.setComponentStatus(position, id, positionComponentStatus);
     });
+
+    // STEP 3: TERMINATE EXTENSION WORKER
+    if (status === 'DISABLED')
+      await ExtensionManager.terminateExtensionWorker(extensionID);
   }
 
-  // STEP 3: TERMINATE EXTENSION WORKER
-  ExtensionManager.terminateExtensionWorker(extensionID);
 };
 
 export const getExtensionStatus = (extensionID: ExtensionID) => {

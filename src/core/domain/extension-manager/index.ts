@@ -4,7 +4,7 @@ import ObserverWithConditions from "patterns/observer";
 import TokenBucketRateLimit, { BucketOptions } from "patterns/token-bucket-rate-limit";
 // import TokenBucketRateLimit from "patterns/token-bucket-rate-limit";
 import { createAPIPath } from "UI/utils/api";
-import MessageManager, { EXT_MSG_EVENT_TYPE } from "../message-manager";
+import MessageManager, { CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG } from "../message-manager";
 import SDK from "../sdk";
 import ExtensionInfoManager, { ExtensionInfo } from "./extension-info-manager";
 import ExtensionWorkerManager, {
@@ -44,7 +44,7 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
     );
 
     // Forward handling result from messange manager to worker
-    window.addEventListener(EXT_MSG_EVENT_TYPE, (event: any) => {
+    window.addEventListener(CUSTOM_EVENT_TYPE_EXT_AWAIT_MSG, (event: any) => {
       const { detail } = event;
       const message: Message = detail;
       const { source } = message as { source: ExtSourceOrTarget };
@@ -183,7 +183,9 @@ class ExtensionManager extends ObserverWithConditions<{ id: ExtensionID }> {
 
     const { data } = event;
 
-    const { target } = data;
+    const { target, type } = data;
+
+    if (type.includes('RESPONSE')) return; // No handle RESPONSE message
 
     if (target === "sdk") {
       const sdk = SDK.getInstance();
